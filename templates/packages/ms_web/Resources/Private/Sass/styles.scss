@@ -1,0 +1,89 @@
+@import "basic";
+@import "mixins";
+@import "header";
+@import "footer";
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: $font-family-body;
+    background: $color-bg;
+    color: $color-text;
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+::selection {
+    background: $color-primary;
+    color: $color-white;
+}
+
+main {
+    max-width: $content-max-width;
+    margin: 0 auto;
+    padding: 0 $content-padding-x;
+
+    @include breakpoint-down(md) {
+        padding: 0 $content-padding-x-mobile;
+    }
+}
+
+p {
+    margin: 0 0 16px;
+}
+
+a {
+    @include transitionAll(0.25);
+
+    &:hover,
+    &:focus {
+        text-decoration: none;
+    }
+}
+
+// Sections common
+section.content-section {
+    padding: $section-padding-y $content-padding-x;
+    max-width: $content-max-width;
+    margin: 0 auto;
+
+    @include breakpoint-down(md) {
+        padding: $section-padding-y-mobile $content-padding-x-mobile;
+    }
+}
+
+// Content sections within dynamic content
+.ce-textpic,
+.ce-text,
+.ce-default {
+    padding: $section-padding-y 0;
+
+    @include breakpoint-down(md) {
+        padding: $section-padding-y-mobile 0;
+    }
+}
+
+// Utility
+.btn {
+    display: inline-block;
+    padding: 0.85rem 2rem;
+    border-radius: $border-radius;
+    border: 0;
+    cursor: pointer;
+    font-size: $font-size-sm;
+    font-weight: 600;
+    text-align: center;
+    @include transitionAll(0.25);
+}
+
+.btn-default,
+.btn-primary {
+    background-color: $color-primary;
+    color: $color-white;
+
+    &:hover {
+        opacity: 0.9;
+    }
+}

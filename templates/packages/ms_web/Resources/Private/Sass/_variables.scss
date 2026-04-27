@@ -1,0 +1,50 @@
+$color-black: #000000;
+$color-white: #ffffff;
+$color-primary: #2563eb;
+$color-gray: #d5d5d5;
+
+$color-bg: #ffffff;
+$color-bg-light: #f9fafb;
+$color-bg-card: #f3f4f6;
+$color-text: #1f2937;
+$color-text-dim: #4b5563;
+$color-text-muted: #6b7280;
+$color-text-subtle: #9ca3af;
+
+$font-family-body: 'Inter', system-ui, -apple-system, sans-serif;
+$font-family-mono: 'Fira Code', monospace;
+
+// Breakpoints
+$breakpoint-sm: 576px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 960px;
+
+// Layout
+$content-max-width: 960px;
+$content-padding-x: 2rem;
+$content-padding-x-mobile: 1.25rem;
+$section-padding-y: 5rem;
+$section-padding-y-mobile: 3rem;
+
+// Border radius
+$border-radius: 8px;
+$border-radius-md: 10px;
+$border-radius-lg: 12px;
+
+// Typography
+$font-size: 1rem;
+$font-size-sm: 0.85rem;
+$font-size-xs: 0.7rem;
+
+$h1-font-size: 2.2rem;
+$h2-font-size: 2.2rem;
+$h3-font-size: 1.25rem;
+$h4-font-size: 1.1rem;
+$h5-font-size: 1rem;
+$h6-font-size: 0.875rem;
+$h1-line-height: 1.2;
+$h2-line-height: 1.2;
+$h3-line-height: 1.4;
+$h4-line-height: 1.4;
+$h5-line-height: 1.4;
+$h6-line-height: 1.4;

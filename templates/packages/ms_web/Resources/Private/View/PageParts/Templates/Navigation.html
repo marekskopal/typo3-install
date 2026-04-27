@@ -1,0 +1,32 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+
+<header class="site-header">
+    <nav class="top-nav">
+        <a href="/" class="nav-logo">{websiteTitle}</a>
+
+        <div class="nav-right">
+            <ul class="nav-links">
+                <f:for each="{menu}" as="menuItem">
+                    <li>
+                        <a href="{menuItem.link}" title="{menuItem.title}"
+                           {f:if(condition: menuItem.active, then: 'class="active"')}
+                        >{menuItem.title}</a>
+                    </li>
+                </f:for>
+            </ul>
+
+            <f:if condition="{languageNavigation} && {languageNavigation -> f:count()} > 1">
+                <div class="lang-switch">
+                    <f:for each="{languageNavigation}" as="item" iteration="iterator">
+                        <a href="{item.link}" hreflang="{item.hreflang}" title="{item.navigationTitle}"{f:if(condition: item.active, then: ' class="active"')}>{item.twoLetterIsoCode}</a>
+                        <f:if condition="!{iterator.isLast}">
+                            <span class="lang-sep">/</span>
+                        </f:if>
+                    </f:for>
+                </div>
+            </f:if>
+        </div>
+    </nav>
+</header>
+
+</html>

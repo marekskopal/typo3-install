@@ -1,0 +1,68 @@
+.site-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background-color: $color-bg;
+    border-bottom: 1px solid $color-gray;
+
+    .top-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        max-width: $content-max-width;
+        margin: 0 auto;
+        padding: 1rem $content-padding-x;
+
+        @include breakpoint-down(md) {
+            padding: 0.75rem $content-padding-x-mobile;
+        }
+    }
+
+    .nav-logo {
+        font-weight: 700;
+        font-size: 1.25rem;
+        color: $color-text;
+        @include transitionAll(0.25);
+
+        &:hover {
+            color: $color-primary;
+        }
+    }
+
+    .nav-links {
+        display: flex;
+        gap: 2rem;
+
+        @include breakpoint-down(md) {
+            display: none;
+        }
+
+        a {
+            color: $color-text-dim;
+            @include transitionAll(0.25);
+
+            &:hover {
+                color: $color-primary;
+            }
+        }
+    }
+
+    .lang-switch {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-left: 2rem;
+        font-size: $font-size-sm;
+
+        a {
+            color: $color-text-muted;
+            text-transform: uppercase;
+            @include transitionAll(0.25);
+
+            &:hover,
+            &.active {
+                color: $color-primary;
+            }
+        }
+    }
+}

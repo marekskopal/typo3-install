@@ -1,0 +1,24 @@
+@mixin transitionAll($time) {
+    transition: all #{$time}s cubic-bezier(.25, .1, .25, 1);
+}
+
+// Breakpoint mixins
+@mixin breakpoint-down($size) {
+    @if $size == sm {
+        @media (max-width: ($breakpoint-sm - 1px)) { @content; }
+    } @else if $size == md {
+        @media (max-width: ($breakpoint-md - 1px)) { @content; }
+    } @else if $size == lg {
+        @media (max-width: ($breakpoint-lg - 1px)) { @content; }
+    }
+}
+
+@mixin breakpoint-up($size) {
+    @if $size == sm {
+        @media (min-width: $breakpoint-sm) { @content; }
+    } @else if $size == md {
+        @media (min-width: $breakpoint-md) { @content; }
+    } @else if $size == lg {
+        @media (min-width: $breakpoint-lg) { @content; }
+    }
+}

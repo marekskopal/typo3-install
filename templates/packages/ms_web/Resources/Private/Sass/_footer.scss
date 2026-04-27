@@ -1,0 +1,17 @@
+.site-footer {
+    text-align: center;
+    padding: 2rem $content-padding-x;
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    border-top: 1px solid $color-gray;
+    margin-top: $section-padding-y;
+
+    a {
+        color: $color-text-dim;
+        @include transitionAll(0.25);
+
+        &:hover {
+            color: $color-primary;
+        }
+    }
+}

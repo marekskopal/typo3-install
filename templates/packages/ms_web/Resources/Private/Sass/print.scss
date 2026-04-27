@@ -1,0 +1,24 @@
+@media print {
+    .no-print {
+        display: none;
+    }
+
+    header,
+    .site-header {
+        display: none;
+    }
+
+    body {
+        background-color: #fff !important;
+        color: #000 !important;
+    }
+
+    .content {
+        margin-top: 0;
+    }
+
+    footer,
+    .site-footer {
+        display: none;
+    }
+}

@@ -1,0 +1,69 @@
+h1, .h1 {
+    font-family: $font-family-body;
+    font-size: $h1-font-size;
+    line-height: $h1-line-height;
+    font-weight: 700;
+    color: $color-text;
+}
+
+h2, .h2 {
+    font-family: $font-family-body;
+    font-size: $h2-font-size;
+    line-height: $h2-line-height;
+    font-weight: 700;
+    margin-bottom: 2.5rem;
+    color: $color-text;
+}
+
+h3, .h3 {
+    font-family: $font-family-body;
+    font-size: $h3-font-size;
+    line-height: $h3-line-height;
+    font-weight: 600;
+    color: $color-text;
+}
+
+h4, .h4 {
+    font-family: $font-family-body;
+    font-size: $h4-font-size;
+    line-height: $h4-line-height;
+    font-weight: 600;
+    color: $color-text;
+}
+
+h5, .h5 {
+    font-family: $font-family-body;
+    font-size: $h5-font-size;
+    line-height: $h5-line-height;
+    font-weight: 600;
+    color: $color-text;
+}
+
+h6, .h6 {
+    font-family: $font-family-body;
+    font-size: $h6-font-size;
+    line-height: $h6-line-height;
+    font-weight: 600;
+    color: $color-text;
+}
+
+strong {
+    font-weight: 500;
+    color: $color-text;
+}
+
+figure {
+    margin: 0;
+}
+
+a {
+    cursor: pointer;
+}
+
+.text-center {
+    text-align: center;
+}
+.text-end,
+.text-right {
+    text-align: right;
+}

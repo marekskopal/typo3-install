@@ -58,6 +58,7 @@ class DatabaseSetupGenerator extends AbstractGenerator
 
         $this->insertPageTree($pdo, $projectName);
         $this->insertSysTemplate($pdo, $projectName, $targetDir, $extensions);
+        $this->insertSysFileStorage($pdo);
 
         $adminUsername = $this->stringFromConfig($config, 'admin_username');
         $adminEmail = $this->stringFromConfig($config, 'admin_email');
@@ -269,6 +270,79 @@ class DatabaseSetupGenerator extends AbstractGenerator
             ]);
             echo "  Page uid={$page['uid']}: '{$page['title']}' created\n";
         }
+    }
+
+    private function insertSysFileStorage(PDO $pdo): void
+    {
+        echo "  Creating default sys_file_storage (fileadmin)...\n";
+
+        try {
+            $stmt = $pdo->query('SELECT COUNT(*) FROM `sys_file_storage` WHERE `name` = \'fileadmin\' AND `deleted` = 0');
+        } catch (PDOException $e) {
+            echo '  WARNING: sys_file_storage table not available, skipping storage creation: ' . $e->getMessage() . "\n";
+            return;
+        }
+
+        if ($stmt === false) {
+            return;
+        }
+
+        if ((int) $stmt->fetchColumn() > 0) {
+            echo "  sys_file_storage 'fileadmin' already exists, skipping storage creation\n";
+            return;
+        }
+
+        $configuration = <<<'XML'
+            <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+            <T3FlexForms>
+                <data>
+                    <sheet index="sDEF">
+                        <language index="lDEF">
+                            <field index="basePath">
+                                <value index="vDEF">fileadmin/</value>
+                            </field>
+                            <field index="pathType">
+                                <value index="vDEF">relative</value>
+                            </field>
+                            <field index="caseSensitive">
+                                <value index="vDEF">1</value>
+                            </field>
+                            <field index="baseUri">
+                                <value index="vDEF"></value>
+                            </field>
+                        </language>
+                    </sheet>
+                </data>
+            </T3FlexForms>
+            XML;
+        $configuration = preg_replace('/^            /m', '', $configuration) ?? $configuration;
+
+        $now = time();
+        $stmt = $pdo->prepare('
+            INSERT INTO `sys_file_storage`
+                (`pid`, `tstamp`, `crdate`, `description`, `name`, `driver`, `configuration`,
+                 `is_default`, `is_browsable`, `is_public`, `is_writable`, `is_online`, `auto_extract_metadata`)
+            VALUES
+                (:pid, :tstamp, :crdate, :description, :name, :driver, :configuration,
+                 :is_default, :is_browsable, :is_public, :is_writable, :is_online, :auto_extract_metadata)
+        ');
+        $stmt->execute([
+            'pid' => 0,
+            'tstamp' => $now,
+            'crdate' => $now,
+            'description' => 'This is the local fileadmin/ directory. This storage mount has been created automatically by TYPO3.',
+            'name' => 'fileadmin',
+            'driver' => 'Local',
+            'configuration' => $configuration,
+            'is_default' => 1,
+            'is_browsable' => 1,
+            'is_public' => 1,
+            'is_writable' => 1,
+            'is_online' => 1,
+            'auto_extract_metadata' => 1,
+        ]);
+
+        echo "  sys_file_storage 'fileadmin' created\n";
     }
 
     private function insertBeUser(PDO $pdo, string $username, string $email, string $password): void

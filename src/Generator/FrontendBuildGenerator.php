@@ -9,6 +9,7 @@ class FrontendBuildGenerator extends AbstractGenerator
     public function generate(array $config, string $targetDir): void
     {
         $this->copyTemplate('package.json', $targetDir);
+        $this->copyTemplate('pnpm-workspace.yaml', $targetDir);
         $this->copyTemplate('gulpfile.js', $targetDir);
     }
 }

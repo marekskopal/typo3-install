@@ -52,6 +52,10 @@ Options:
   -d, --default-language <code>  Default language (default: first of --languages)
       --setup-db                 Run database setup after scaffolding
       --no-setup-db              Skip database setup
+      --db-name <name>           Database name (default: derived from machine name)
+      --db-host <host>           Database host (default: 127.0.0.1)
+      --db-user <user>           Database user (default: root)
+      --db-password <pass>       Database password (default: empty)
       --init-git                 Initialize git repo
       --no-init-git              Skip git initialization
   -y, --yes                      Non-interactive mode. Use defaults for any
@@ -80,6 +84,11 @@ CLI_EXTENSIONS=""
 CLI_LANGUAGES=""
 CLI_DEFAULT_LANG=""
 SETUP_DB_FLAG=""
+CLI_DB_NAME=""
+CLI_DB_HOST=""
+CLI_DB_USER=""
+CLI_DB_PASSWORD=""
+CLI_DB_PASSWORD_SET=false
 INIT_GIT_FLAG=""
 ASSUME_YES=false
 LIST_EXTENSIONS_ONLY=false
@@ -104,6 +113,10 @@ while [ $# -gt 0 ]; do
         -d|--default-language) require_value "$1" "$2"; CLI_DEFAULT_LANG="$2"; shift 2;;
         --setup-db) SETUP_DB_FLAG="y"; shift;;
         --no-setup-db) SETUP_DB_FLAG="n"; shift;;
+        --db-name) require_value "$1" "$2"; CLI_DB_NAME="$2"; shift 2;;
+        --db-host) require_value "$1" "$2"; CLI_DB_HOST="$2"; shift 2;;
+        --db-user) require_value "$1" "$2"; CLI_DB_USER="$2"; shift 2;;
+        --db-password) CLI_DB_PASSWORD="${2:-}"; CLI_DB_PASSWORD_SET=true; shift 2;;
         --init-git) INIT_GIT_FLAG="y"; shift;;
         --no-init-git) INIT_GIT_FLAG="n"; shift;;
         -y|--yes) ASSUME_YES=true; shift;;
@@ -286,38 +299,41 @@ fi
 
 if [ "$EXTENSIONS_FROM_CLI" = false ] && [ "$ASSUME_YES" = false ]; then
     print_header "Extension Selection"
+    print_step "typo3-core is always included"
 
-    while true; do
-        echo ""
-        for i in "${!EXT_NAMES[@]}"; do
-            if [ "${EXT_SELECTED[$i]}" = "1" ]; then
-                marker="${GREEN}[x]${NC}"
-            else
-                marker="[ ]"
-            fi
-            if [ "$i" = "0" ]; then
-                echo -e "  $marker ${BOLD}${EXT_NAMES[$i]}${NC} (${EXT_DESCRIPTIONS[$i]})"
-            else
-                printf "  $marker %d) %-25s %s\n" "$i" "${EXT_NAMES[$i]}" "(${EXT_DESCRIPTIONS[$i]})"
-            fi
-        done
-        echo ""
-        read -p "Toggle extension number (or Enter to confirm): " TOGGLE
-        if [ -z "$TOGGLE" ]; then
-            break
-        fi
-        if [[ "$TOGGLE" =~ ^[0-9]+$ ]] && [ "$TOGGLE" -ge 1 ] && [ "$TOGGLE" -lt "${#EXT_NAMES[@]}" ]; then
-            if [ "${EXT_SELECTED[$TOGGLE]}" = "1" ]; then
-                EXT_SELECTED[$TOGGLE]="0"
-            else
-                EXT_SELECTED[$TOGGLE]="1"
-            fi
-        elif [ "$TOGGLE" = "0" ]; then
-            print_warn "typo3-core is required and cannot be deselected"
-        else
-            print_warn "Invalid number"
+    EXT_OPTS=""
+    EXT_DEFS=""
+    FIRST_OPT=true
+    FIRST_DEF=true
+    for i in "${!EXT_NAMES[@]}"; do
+        [ "$i" = "0" ] && continue
+        if [ "$FIRST_OPT" = true ]; then FIRST_OPT=false; else EXT_OPTS+=","; fi
+        EXT_OPTS+="\"${EXT_NAMES[$i]}\":\"${EXT_NAMES[$i]} - ${EXT_DESCRIPTIONS[$i]}\""
+        if [ "${EXT_SELECTED[$i]}" = "1" ]; then
+            if [ "$FIRST_DEF" = true ]; then FIRST_DEF=false; else EXT_DEFS+=","; fi
+            EXT_DEFS+="\"${EXT_NAMES[$i]}\""
         fi
     done
+
+    EXT_SPEC="{\"label\":\"Select optional extensions\",\"options\":{$EXT_OPTS},\"default\":[$EXT_DEFS],\"hint\":\"Arrow keys to move, Space to toggle, Enter to confirm\"}"
+
+    EXT_RESULT_FILE=$(mktemp -t typo3-ext-XXXXXX)
+    php "$SCRIPT_DIR/bin/prompt.php" multiselect "$EXT_SPEC" "$EXT_RESULT_FILE"
+
+    for i in "${!EXT_NAMES[@]}"; do
+        [ "$i" = "0" ] && continue
+        EXT_SELECTED[$i]="0"
+    done
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        for i in "${!EXT_NAMES[@]}"; do
+            if [ "${EXT_NAMES[$i]}" = "$line" ]; then
+                EXT_SELECTED[$i]="1"
+                break
+            fi
+        done
+    done < "$EXT_RESULT_FILE"
+    rm -f "$EXT_RESULT_FILE"
 fi
 
 # Build selected extensions JSON array
@@ -342,39 +358,31 @@ SELECTED_EXT_JSON+="]"
 if [ "$LANGUAGES_FROM_CLI" = false ] && [ "$ASSUME_YES" = false ]; then
     print_header "Language Selection"
 
-    while true; do
-        echo ""
-        for i in "${!LANG_CODES[@]}"; do
-            if [ "${LANG_SELECTED[$i]}" = "1" ]; then
-                marker="${GREEN}[x]${NC}"
-            else
-                marker="[ ]"
-            fi
-            echo -e "  $marker $((i+1))) ${LANG_NAMES[$i]} (${LANG_CODES[$i]})"
-        done
-        echo ""
-        read -p "Toggle language number (or Enter to confirm): " TOGGLE
-        if [ -z "$TOGGLE" ]; then
-            HAS_LANG=false
-            for sel in "${LANG_SELECTED[@]}"; do
-                [ "$sel" = "1" ] && HAS_LANG=true
-            done
-            if [ "$HAS_LANG" = true ]; then
-                break
-            else
-                print_warn "Select at least one language"
-            fi
-        elif [[ "$TOGGLE" =~ ^[1-3]$ ]]; then
-            IDX=$((TOGGLE - 1))
-            if [ "${LANG_SELECTED[$IDX]}" = "1" ]; then
-                LANG_SELECTED[$IDX]="0"
-            else
-                LANG_SELECTED[$IDX]="1"
-            fi
-        else
-            print_warn "Invalid number (1-3)"
-        fi
+    LANG_OPTS=""
+    FIRST_OPT=true
+    for i in "${!LANG_CODES[@]}"; do
+        if [ "$FIRST_OPT" = true ]; then FIRST_OPT=false; else LANG_OPTS+=","; fi
+        LANG_OPTS+="\"${LANG_CODES[$i]}\":\"${LANG_NAMES[$i]} (${LANG_CODES[$i]})\""
     done
+
+    LANG_SPEC="{\"label\":\"Select languages\",\"options\":{$LANG_OPTS},\"default\":[\"en\"],\"required\":true,\"hint\":\"Arrow keys to move, Space to toggle, Enter to confirm\"}"
+
+    LANG_RESULT_FILE=$(mktemp -t typo3-lang-XXXXXX)
+    php "$SCRIPT_DIR/bin/prompt.php" multiselect "$LANG_SPEC" "$LANG_RESULT_FILE"
+
+    for i in "${!LANG_CODES[@]}"; do
+        LANG_SELECTED[$i]="0"
+    done
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        for i in "${!LANG_CODES[@]}"; do
+            if [ "${LANG_CODES[$i]}" = "$line" ]; then
+                LANG_SELECTED[$i]="1"
+                break
+            fi
+        done
+    done < "$LANG_RESULT_FILE"
+    rm -f "$LANG_RESULT_FILE"
 elif [ "$LANGUAGES_FROM_CLI" = false ] && [ "$ASSUME_YES" = true ]; then
     LANG_SELECTED=("0" "1" "0")
 fi
@@ -410,19 +418,18 @@ elif [ "$ASSUME_YES" = true ]; then
     DEFAULT_LANG="${SELECTED_LANGS[0]}"
     print_step "Default language: $DEFAULT_LANG (first of --languages)"
 else
-    echo ""
-    echo "Select the default language:"
-    for i in "${!SELECTED_LANGS[@]}"; do
-        echo "  $((i+1))) ${SELECTED_LANGS[$i]}"
+    DEF_LANG_OPTS=""
+    FIRST_OPT=true
+    for lang in "${SELECTED_LANGS[@]}"; do
+        if [ "$FIRST_OPT" = true ]; then FIRST_OPT=false; else DEF_LANG_OPTS+=","; fi
+        DEF_LANG_OPTS+="\"$lang\":\"$lang\""
     done
-    read -p "Default language number: " DEF_LANG_NUM
-    DEF_LANG_IDX=$((DEF_LANG_NUM - 1))
-    if [ "$DEF_LANG_IDX" -ge 0 ] && [ "$DEF_LANG_IDX" -lt "${#SELECTED_LANGS[@]}" ]; then
-        DEFAULT_LANG="${SELECTED_LANGS[$DEF_LANG_IDX]}"
-    else
-        print_error "Invalid selection"
-        exit 1
-    fi
+    DEF_LANG_SPEC="{\"label\":\"Default language\",\"options\":{$DEF_LANG_OPTS},\"default\":\"${SELECTED_LANGS[0]}\",\"hint\":\"Arrow keys to move, Enter to confirm\"}"
+
+    DEF_LANG_RESULT_FILE=$(mktemp -t typo3-deflang-XXXXXX)
+    php "$SCRIPT_DIR/bin/prompt.php" select "$DEF_LANG_SPEC" "$DEF_LANG_RESULT_FILE"
+    DEFAULT_LANG=$(cat "$DEF_LANG_RESULT_FILE")
+    rm -f "$DEF_LANG_RESULT_FILE"
 fi
 
 # Build languages JSON
@@ -547,8 +554,74 @@ else
     SETUP_DB="$SETUP_DB_FLAG"
 fi
 if [ "$SETUP_DB" = "y" ]; then
+    DEFAULT_DB_NAME=$(echo "$MACHINE_NAME" | tr '-' '_')
+
+    DB_NAME="$CLI_DB_NAME"
+    DB_HOST="$CLI_DB_HOST"
+    DB_USER="$CLI_DB_USER"
+    if [ "$CLI_DB_PASSWORD_SET" = true ]; then
+        DB_PASSWORD="$CLI_DB_PASSWORD"
+        DB_PASSWORD_SET=true
+    else
+        DB_PASSWORD=""
+        DB_PASSWORD_SET=false
+    fi
+
+    if [ "$ASSUME_YES" = true ]; then
+        [ -z "$DB_NAME" ] && DB_NAME="$DEFAULT_DB_NAME"
+        [ -z "$DB_HOST" ] && DB_HOST="127.0.0.1"
+        [ -z "$DB_USER" ] && DB_USER="root"
+        [ "$DB_PASSWORD_SET" = false ] && DB_PASSWORD=""
+    else
+        print_header "Database Credentials"
+        if [ -z "$DB_NAME" ]; then
+            read -p "Database name [$DEFAULT_DB_NAME]: " DB_NAME
+            DB_NAME=${DB_NAME:-$DEFAULT_DB_NAME}
+        fi
+        if [ -z "$DB_HOST" ]; then
+            read -p "Database host [127.0.0.1]: " DB_HOST
+            DB_HOST=${DB_HOST:-127.0.0.1}
+        fi
+        if [ -z "$DB_USER" ]; then
+            read -p "Database user [root]: " DB_USER
+            DB_USER=${DB_USER:-root}
+        fi
+        if [ "$DB_PASSWORD_SET" = false ]; then
+            read -s -p "Database password (leave empty for none): " DB_PASSWORD
+            echo ""
+        fi
+    fi
+
+    # Escape values for JSON (backslash and double quote)
+    json_escape() {
+        printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
+    }
+    DB_NAME_ESC=$(json_escape "$DB_NAME")
+    DB_HOST_ESC=$(json_escape "$DB_HOST")
+    DB_USER_ESC=$(json_escape "$DB_USER")
+    DB_PASSWORD_ESC=$(json_escape "$DB_PASSWORD")
+
+    DB_CONFIG_JSON=$(cat <<JSONEOF
+{
+    "project_name": "$PROJECT_NAME",
+    "machine_name": "$MACHINE_NAME",
+    "hostname": "$HOSTNAME",
+    "dev_http_port": "$DEV_HTTP_PORT",
+    "dev_ssl_port": "$DEV_SSL_PORT",
+    "target_dir": "$TARGET_DIR",
+    "extensions": $SELECTED_EXT_JSON,
+    "languages": $LANGS_JSON,
+    "default_language": "$DEFAULT_LANG",
+    "db_name": "$DB_NAME_ESC",
+    "db_host": "$DB_HOST_ESC",
+    "db_user": "$DB_USER_ESC",
+    "db_password": "$DB_PASSWORD_ESC"
+}
+JSONEOF
+)
+
     print_step "Setting up database..."
-    $GEN DatabaseSetup "$CONFIG_JSON" "$TARGET_DIR"
+    $GEN DatabaseSetup "$DB_CONFIG_JSON" "$TARGET_DIR"
 fi
 
 # Step 12: Git init (optional)

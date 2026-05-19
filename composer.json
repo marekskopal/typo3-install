@@ -15,7 +15,8 @@
         }
     ],
     "require": {
-        "php": ">=8.4"
+        "php": ">=8.4",
+        "laravel/prompts": "^0.3.18"
     },
     "require-dev": {
         "phpstan/extension-installer": "^1.4",

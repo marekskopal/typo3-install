@@ -16,14 +16,18 @@ class DatabaseSetupGenerator extends AbstractGenerator
         /** @var string $projectName */
         $projectName = $config['project_name'];
 
-        $dbName = str_replace('-', '_', $machineName);
+        $defaultDbName = str_replace('-', '_', $machineName);
 
         $envVars = $this->loadEnvFile($targetDir . '/.env');
 
-        $dbHost = $envVars['MYSQL_HOST'] ?? $this->getEnvString('MYSQL_HOST', '127.0.0.1');
-        $dbUser = $envVars['MYSQL_USER'] ?? $this->getEnvString('MYSQL_USER', 'root');
-        $dbPassword = $envVars['MYSQL_PASSWORD'] ?? $this->getEnvString('MYSQL_PASSWORD', '');
-        $dbRootPassword = $envVars['MYSQL_ROOT_PASSWORD'] ?? $this->getEnvString('MYSQL_ROOT_PASSWORD', '');
+        $dbName = $this->stringFromConfig($config, 'db_name')
+            ?? ($envVars['MYSQL_DATABASE'] ?? $defaultDbName);
+        $dbHost = $this->stringFromConfig($config, 'db_host')
+            ?? ($envVars['MYSQL_HOST'] ?? $this->getEnvString('MYSQL_HOST', '127.0.0.1'));
+        $dbUser = $this->stringFromConfig($config, 'db_user')
+            ?? ($envVars['MYSQL_USER'] ?? $this->getEnvString('MYSQL_USER', 'root'));
+        $dbPassword = $this->stringFromConfig($config, 'db_password')
+            ?? ($envVars['MYSQL_PASSWORD'] ?? $this->getEnvString('MYSQL_PASSWORD', ''));
 
         if ($dbHost === 'host.docker.internal') {
             $dbHost = '127.0.0.1';
@@ -33,15 +37,56 @@ class DatabaseSetupGenerator extends AbstractGenerator
         echo "  Host: {$dbHost}\n";
         echo "  User: {$dbUser}\n";
 
-        $connectPassword = $dbPassword !== '' ? $dbPassword : $dbRootPassword;
-        $pdo = $this->connectAndCreateDatabase($dbHost, $dbUser, $connectPassword, $dbName);
+        $pdo = $this->connectAndCreateDatabase($dbHost, $dbUser, $dbPassword, $dbName);
 
-        $this->runSchemaUpdate($targetDir, $dbHost, $dbName, $dbUser, $connectPassword, $pdo);
+        $this->updateEnvFile($targetDir . '/.env', [
+            'MYSQL_DATABASE' => $dbName,
+            'MYSQL_USER' => $dbUser,
+            'MYSQL_PASSWORD' => $dbPassword,
+        ]);
+
+        $this->runSchemaUpdate($targetDir, $dbHost, $dbName, $dbUser, $dbPassword, $pdo);
         $this->insertPageTree($pdo, $projectName);
 
         echo "\n  To create an admin user, run:\n";
         echo "  cd {$targetDir} && php vendor/bin/typo3 backend:createadmin\n";
         echo "\n  Database setup complete!\n";
+    }
+
+    /** @param array<string, mixed> $config */
+    private function stringFromConfig(array $config, string $key): ?string
+    {
+        if (!array_key_exists($key, $config)) {
+            return null;
+        }
+        $value = $config[$key];
+
+        return is_string($value) ? $value : null;
+    }
+
+    /** @param array<string, string> $values */
+    private function updateEnvFile(string $path, array $values): void
+    {
+        if (!file_exists($path)) {
+            return;
+        }
+
+        $contents = file_get_contents($path);
+        if ($contents === false) {
+            return;
+        }
+
+        foreach ($values as $key => $value) {
+            $pattern = '/^' . preg_quote($key, '/') . '=.*$/m';
+            $replacement = $key . '=' . $value;
+            if (preg_match($pattern, $contents) === 1) {
+                $contents = preg_replace($pattern, $replacement, $contents) ?? $contents;
+            } else {
+                $contents = rtrim($contents, "\n") . "\n" . $replacement . "\n";
+            }
+        }
+
+        file_put_contents($path, $contents);
     }
 
     /** @return array<string, string> */

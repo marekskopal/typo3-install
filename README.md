@@ -2,9 +2,26 @@
 
 Scaffolding tool for TYPO3 v14.3 projects with Docker, SCSS, and multi-language support. Runs interactively or fully unattended via CLI flags.
 
-## Set up the scaffolder
+Requirements: `git`, `composer`, `php` (and optionally `pnpm` for the frontend build).
 
-The scaffolder itself is a PHP tool, so its own dependencies need to be installed once before it can run:
+## Quick start (no clone needed)
+
+Run the installer directly from GitHub — the bootstrap clones the scaffolder into a temp dir, installs its dependencies, runs the installer, and removes the temp dir on exit:
+
+```sh
+# Interactive (process substitution keeps stdin attached to your terminal)
+bash <(curl -fsSL https://raw.githubusercontent.com/marekskopal/typo3-install/main/bootstrap.sh)
+
+# Non-interactive — flags after `--` go to install.sh
+curl -fsSL https://raw.githubusercontent.com/marekskopal/typo3-install/main/bootstrap.sh \
+    | bash -s -- -y --name "My Site" --hostname mysite.cz --extensions fontawesome,faq
+```
+
+The project is created under the directory you ran the command from (or `--target-dir` if given).
+
+## Set up the scaffolder (manual)
+
+If you'd rather clone first, install the scaffolder's own dependencies once:
 
 ```sh
 composer install

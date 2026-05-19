@@ -59,8 +59,13 @@ class DatabaseSetupGenerator extends AbstractGenerator
         $this->insertPageTree($pdo, $projectName);
         $this->insertSysTemplate($pdo, $projectName, $targetDir, $extensions);
 
-        echo "\n  To create an admin user, run:\n";
-        echo "  cd {$targetDir} && php vendor/bin/typo3 setup --no-interaction --force --admin-username=admin --admin-user-password=<password> --admin-email=<email>\n";
+        $adminUsername = $this->stringFromConfig($config, 'admin_username');
+        $adminEmail = $this->stringFromConfig($config, 'admin_email');
+        $adminPassword = $this->stringFromConfig($config, 'admin_password');
+        if ($adminUsername !== null && $adminUsername !== '' && $adminPassword !== null && $adminPassword !== '') {
+            $this->insertBeUser($pdo, $adminUsername, $adminEmail ?? '', $adminPassword);
+        }
+
         echo "\n  Database setup complete!\n";
     }
 
@@ -264,6 +269,46 @@ class DatabaseSetupGenerator extends AbstractGenerator
             ]);
             echo "  Page uid={$page['uid']}: '{$page['title']}' created\n";
         }
+    }
+
+    private function insertBeUser(PDO $pdo, string $username, string $email, string $password): void
+    {
+        echo "  Creating admin backend user '{$username}'...\n";
+
+        try {
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM `be_users` WHERE `username` = :username AND `deleted` = 0');
+        } catch (PDOException $e) {
+            echo '  WARNING: be_users table not available, skipping admin user creation: ' . $e->getMessage() . "\n";
+            return;
+        }
+
+        $stmt->execute(['username' => $username]);
+        if ((int) $stmt->fetchColumn() > 0) {
+            echo "  be_user '{$username}' already exists, skipping admin user creation\n";
+            return;
+        }
+
+        $hash = password_hash($password, PASSWORD_ARGON2I);
+
+        $now = time();
+        $stmt = $pdo->prepare('
+            INSERT INTO `be_users` (`pid`, `tstamp`, `crdate`, `username`, `password`, `admin`, `lang`, `email`, `options`, `workspace_perms`)
+            VALUES (:pid, :tstamp, :crdate, :username, :password, :admin, :lang, :email, :options, :workspace_perms)
+        ');
+        $stmt->execute([
+            'pid' => 0,
+            'tstamp' => $now,
+            'crdate' => $now,
+            'username' => $username,
+            'password' => $hash,
+            'admin' => 1,
+            'lang' => 'en',
+            'email' => $email,
+            'options' => 0,
+            'workspace_perms' => 1,
+        ]);
+
+        echo "  Admin be_user '{$username}' created\n";
     }
 
     /** @param list<array{name: string, version: string}> $extensions */

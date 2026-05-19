@@ -57,6 +57,9 @@ Options:
       --db-host <host>           Database host (default: 127.0.0.1)
       --db-user <user>           Database user (default: root)
       --db-password <pass>       Database password (default: empty)
+      --admin-username <name>    Admin backend user (default: admin)
+      --admin-email <email>      Admin backend user email
+      --admin-password <pass>    Admin backend user password
       --init-git                 Initialize git repo
       --no-init-git              Skip git initialization
   -y, --yes                      Non-interactive mode. Use defaults for any
@@ -90,6 +93,10 @@ CLI_DB_HOST=""
 CLI_DB_USER=""
 CLI_DB_PASSWORD=""
 CLI_DB_PASSWORD_SET=false
+CLI_ADMIN_USERNAME=""
+CLI_ADMIN_EMAIL=""
+CLI_ADMIN_PASSWORD=""
+CLI_ADMIN_PASSWORD_SET=false
 INIT_GIT_FLAG=""
 ASSUME_YES=false
 LIST_EXTENSIONS_ONLY=false
@@ -118,6 +125,9 @@ while [ $# -gt 0 ]; do
         --db-host) require_value "$1" "$2"; CLI_DB_HOST="$2"; shift 2;;
         --db-user) require_value "$1" "$2"; CLI_DB_USER="$2"; shift 2;;
         --db-password) CLI_DB_PASSWORD="${2:-}"; CLI_DB_PASSWORD_SET=true; shift 2;;
+        --admin-username) require_value "$1" "$2"; CLI_ADMIN_USERNAME="$2"; shift 2;;
+        --admin-email) require_value "$1" "$2"; CLI_ADMIN_EMAIL="$2"; shift 2;;
+        --admin-password) CLI_ADMIN_PASSWORD="${2:-}"; CLI_ADMIN_PASSWORD_SET=true; shift 2;;
         --init-git) INIT_GIT_FLAG="y"; shift;;
         --no-init-git) INIT_GIT_FLAG="n"; shift;;
         -y|--yes) ASSUME_YES=true; shift;;
@@ -591,6 +601,40 @@ if [ "$SETUP_DB" = "y" ]; then
         fi
     fi
 
+    # Admin backend user credentials
+    ADMIN_USERNAME="$CLI_ADMIN_USERNAME"
+    ADMIN_EMAIL="$CLI_ADMIN_EMAIL"
+    if [ "$CLI_ADMIN_PASSWORD_SET" = true ]; then
+        ADMIN_PASSWORD="$CLI_ADMIN_PASSWORD"
+        ADMIN_PASSWORD_SET=true
+    else
+        ADMIN_PASSWORD=""
+        ADMIN_PASSWORD_SET=false
+    fi
+
+    if [ "$ASSUME_YES" = true ]; then
+        [ -z "$ADMIN_USERNAME" ] && ADMIN_USERNAME="admin"
+    else
+        print_header "Admin Backend User"
+        if [ -z "$ADMIN_USERNAME" ]; then
+            read -p "Admin username [admin]: " ADMIN_USERNAME
+            ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+        fi
+        if [ -z "$ADMIN_EMAIL" ]; then
+            read -p "Admin email: " ADMIN_EMAIL
+        fi
+        if [ "$ADMIN_PASSWORD_SET" = false ]; then
+            while true; do
+                read -s -p "Admin password: " ADMIN_PASSWORD
+                echo ""
+                if [ -n "$ADMIN_PASSWORD" ]; then
+                    break
+                fi
+                print_warn "Password cannot be empty"
+            done
+        fi
+    fi
+
     # Escape values for JSON (backslash and double quote)
     json_escape() {
         printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
@@ -599,6 +643,9 @@ if [ "$SETUP_DB" = "y" ]; then
     DB_HOST_ESC=$(json_escape "$DB_HOST")
     DB_USER_ESC=$(json_escape "$DB_USER")
     DB_PASSWORD_ESC=$(json_escape "$DB_PASSWORD")
+    ADMIN_USERNAME_ESC=$(json_escape "$ADMIN_USERNAME")
+    ADMIN_EMAIL_ESC=$(json_escape "$ADMIN_EMAIL")
+    ADMIN_PASSWORD_ESC=$(json_escape "$ADMIN_PASSWORD")
 
     DB_CONFIG_JSON=$(cat <<JSONEOF
 {
@@ -614,7 +661,10 @@ if [ "$SETUP_DB" = "y" ]; then
     "db_name": "$DB_NAME_ESC",
     "db_host": "$DB_HOST_ESC",
     "db_user": "$DB_USER_ESC",
-    "db_password": "$DB_PASSWORD_ESC"
+    "db_password": "$DB_PASSWORD_ESC",
+    "admin_username": "$ADMIN_USERNAME_ESC",
+    "admin_email": "$ADMIN_EMAIL_ESC",
+    "admin_password": "$ADMIN_PASSWORD_ESC"
 }
 JSONEOF
 )

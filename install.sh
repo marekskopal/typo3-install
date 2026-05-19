@@ -144,7 +144,7 @@ EXTENSIONS=(
     "typo3-recipe|marekskopal/typo3-recipe|^1.0|0|Recipe plugin"
     "typo3-reference|marekskopal/typo3-reference|^1.0|0|Reference/portfolio"
     "typo3-timeline|marekskopal/typo3-timeline|^1.0|0|Timeline plugin"
-    "typo3-mcp-server|marekskopal/typo3-mcp-server|^0.3.0|0|MCP server integration"
+    "typo3-mcp-server|marekskopal/typo3-mcp-server|^0.9.0|0|MCP server integration"
 )
 
 declare -a EXT_NAMES EXT_COMPOSERS EXT_VERSIONS EXT_SELECTED EXT_DESCRIPTIONS

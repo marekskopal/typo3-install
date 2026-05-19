@@ -6,13 +6,17 @@ Requirements: `git`, `composer`, `php` (and optionally `pnpm` for the frontend b
 
 ## Quick start (no clone needed)
 
-Run the installer directly from GitHub — the bootstrap clones the scaffolder into a temp dir, installs its dependencies, runs the installer, and removes the temp dir on exit:
+Run the installer directly from GitHub — the bootstrap clones the scaffolder into a temp dir, installs its dependencies, runs the installer, and removes the temp dir on exit.
+
+**Interactive** (process substitution keeps stdin attached to your terminal):
 
 ```sh
-# Interactive (process substitution keeps stdin attached to your terminal)
 bash <(curl -fsSL https://raw.githubusercontent.com/marekskopal/typo3-install/main/bootstrap.sh)
+```
 
-# Non-interactive — flags after `--` go to install.sh
+**Non-interactive** — flags after `--` go to `install.sh`:
+
+```sh
 curl -fsSL https://raw.githubusercontent.com/marekskopal/typo3-install/main/bootstrap.sh \
     | bash -s -- -y --name "My Site" --hostname mysite.cz --extensions fontawesome,faq
 ```
@@ -99,9 +103,26 @@ project/
 
 ## Development
 
+Install scaffolder dependencies:
+
 ```sh
 composer install
+```
+
+Static analysis:
+
+```sh
 vendor/bin/phpstan analyse
+```
+
+Code style:
+
+```sh
 vendor/bin/phpcs
+```
+
+Tests:
+
+```sh
 vendor/bin/phpunit
 ```

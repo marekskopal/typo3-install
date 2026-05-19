@@ -9,5 +9,10 @@
   },
   "scripts": {
     "build": "node_modules/.bin/gulp build"
+  },
+  "pnpm": {
+    "ignoredBuiltDependencies": [
+      "@parcel/watcher"
+    ]
   }
 }

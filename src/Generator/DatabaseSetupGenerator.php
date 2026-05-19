@@ -15,6 +15,8 @@ class DatabaseSetupGenerator extends AbstractGenerator
         $machineName = $config['machine_name'];
         /** @var string $projectName */
         $projectName = $config['project_name'];
+        /** @var list<array{name: string, version: string}> $extensions */
+        $extensions = $config['extensions'] ?? [];
 
         $defaultDbName = str_replace('-', '_', $machineName);
 
@@ -55,6 +57,7 @@ class DatabaseSetupGenerator extends AbstractGenerator
         }
 
         $this->insertPageTree($pdo, $projectName);
+        $this->insertSysTemplate($pdo, $projectName, $targetDir, $extensions);
 
         echo "\n  To create an admin user, run:\n";
         echo "  cd {$targetDir} && php vendor/bin/typo3 setup --no-interaction --force --admin-username=admin --admin-user-password=<password> --admin-email=<email>\n";
@@ -261,5 +264,144 @@ class DatabaseSetupGenerator extends AbstractGenerator
             ]);
             echo "  Page uid={$page['uid']}: '{$page['title']}' created\n";
         }
+    }
+
+    /** @param list<array{name: string, version: string}> $extensions */
+    private function insertSysTemplate(PDO $pdo, string $projectName, string $targetDir, array $extensions): void
+    {
+        echo "  Creating default sys_template...\n";
+
+        try {
+            $stmt = $pdo->query('SELECT COUNT(*) FROM `sys_template`');
+        } catch (PDOException $e) {
+            echo '  WARNING: sys_template table not available, skipping template creation: ' . $e->getMessage() . "\n";
+            return;
+        }
+
+        if ($stmt === false) {
+            return;
+        }
+
+        if ((int) $stmt->fetchColumn() > 0) {
+            echo "  sys_template entries already exist, skipping template creation\n";
+            return;
+        }
+
+        $includeStaticFile = $this->buildIncludeStaticFile($targetDir, $extensions);
+
+        $now = time();
+        $stmt = $pdo->prepare('
+            INSERT INTO `sys_template` (`pid`, `tstamp`, `crdate`, `sorting`, `title`, `root`, `clear`, `include_static_file`, `config`, `basedOn`)
+            VALUES (:pid, :tstamp, :crdate, :sorting, :title, :root, :clear, :include_static_file, :config, :basedOn)
+        ');
+        $stmt->execute([
+            'pid' => 1,
+            'tstamp' => $now,
+            'crdate' => $now,
+            'sorting' => 256,
+            'title' => $projectName,
+            'root' => 1,
+            'clear' => 3,
+            'include_static_file' => $includeStaticFile,
+            'config' => '',
+            'basedOn' => '',
+        ]);
+
+        echo "  sys_template '{$projectName}' created\n";
+    }
+
+    /** @param list<array{name: string, version: string}> $extensions */
+    private function buildIncludeStaticFile(string $targetDir, array $extensions): string
+    {
+        $coreEntry = null;
+        $otherEntries = [];
+
+        foreach ($extensions as $ext) {
+            if (!str_starts_with($ext['name'], 'marekskopal/')) {
+                continue;
+            }
+
+            $entry = $this->buildStaticEntryFromExtensionDir($targetDir . '/vendor/' . $ext['name']);
+            if ($entry === null) {
+                continue;
+            }
+
+            if ($ext['name'] === 'marekskopal/typo3-core') {
+                $coreEntry = $entry;
+            } else {
+                $otherEntries[] = $entry;
+            }
+        }
+
+        $parts = [];
+        foreach ($otherEntries as $entry) {
+            $parts[] = $entry;
+        }
+        if ($coreEntry !== null) {
+            $parts[] = $coreEntry;
+        }
+
+        $msWebEntry = $this->buildStaticEntryFromExtensionDir($targetDir . '/packages/ms_web');
+        if ($msWebEntry !== null) {
+            $parts[] = $msWebEntry;
+        }
+
+        return implode(',', $parts);
+    }
+
+    private function buildStaticEntryFromExtensionDir(string $extDir): ?string
+    {
+        if (!is_dir($extDir)) {
+            return null;
+        }
+
+        $extKey = $this->readExtensionKey($extDir);
+        $setName = $this->readSetName($extDir);
+        if ($extKey === null || $setName === null) {
+            return null;
+        }
+
+        return "EXT:{$extKey}/Configuration/Sets/{$setName}";
+    }
+
+    private function readExtensionKey(string $extDir): ?string
+    {
+        $composerFile = $extDir . '/composer.json';
+        if (!file_exists($composerFile)) {
+            return null;
+        }
+        $contents = file_get_contents($composerFile);
+        if ($contents === false) {
+            return null;
+        }
+        $json = json_decode($contents, true);
+        if (!is_array($json)) {
+            return null;
+        }
+        $extra = $json['extra'] ?? null;
+        if (!is_array($extra)) {
+            return null;
+        }
+        $typo3Cms = $extra['typo3/cms'] ?? null;
+        if (!is_array($typo3Cms)) {
+            return null;
+        }
+        $key = $typo3Cms['extension-key'] ?? null;
+
+        return is_string($key) ? $key : null;
+    }
+
+    private function readSetName(string $extDir): ?string
+    {
+        $setsDir = $extDir . '/Configuration/Sets';
+        if (!is_dir($setsDir)) {
+            return null;
+        }
+        $dirs = glob($setsDir . '/*', GLOB_ONLYDIR);
+        if ($dirs === false || $dirs === []) {
+            return null;
+        }
+
+        return basename($dirs[0]);
     }
 }

@@ -36,7 +36,7 @@ $result = match ($type) {
 };
 
 if (is_array($result)) {
-    file_put_contents($outFile, implode("\n", $result));
+    file_put_contents($outFile, $result === [] ? '' : implode("\n", $result) . "\n");
 } else {
     file_put_contents($outFile, (string) $result);
 }

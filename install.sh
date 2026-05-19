@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -132,7 +133,7 @@ done
 # ─────────────────────────────────────────────
 
 EXTENSIONS=(
-    "typo3-core|marekskopal/typo3-core|^14.3|1|REQUIRED"
+    "typo3-core|marekskopal/typo3-core|^14.1|1|REQUIRED"
     "typo3-google-font|marekskopal/typo3-google-font|^1.0|0|Google Fonts integration"
     "typo3-fontawesome|marekskopal/typo3-fontawesome|^1.0|0|Font Awesome integration"
     "typo3-faq|marekskopal/typo3-faq|^1.0|0|FAQ plugin"
@@ -410,10 +411,6 @@ if [ -n "$CLI_DEFAULT_LANG" ]; then
         print_error "--default-language '$DEFAULT_LANG' is not among the selected languages (${SELECTED_LANGS[*]})"
         exit 1
     fi
-elif [ "${#SELECTED_LANGS[@]}" -eq 1 ]; then
-    DEFAULT_LANG="${SELECTED_LANGS[0]}"
-    echo ""
-    print_step "Default language: $DEFAULT_LANG (only one selected)"
 elif [ "$ASSUME_YES" = true ]; then
     DEFAULT_LANG="${SELECTED_LANGS[0]}"
     print_step "Default language: $DEFAULT_LANG (first of --languages)"
@@ -498,40 +495,42 @@ GEN="php $SCRIPT_DIR/bin/generate.php"
 print_step "Generating composer.json..."
 $GEN ComposerJson "$CONFIG_JSON" "$TARGET_DIR"
 
-# Step 2: Run composer install
-print_step "Running composer install (this may take a while)..."
-cd "$TARGET_DIR"
-COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --no-scripts 2>&1 | tail -5
-
-# Step 3: Generate ms_web extension
+# Step 2: Generate ms_web extension (must exist before composer install
+# so the ./packages/* path repository resolves on first run)
 print_step "Generating ms_web extension..."
 $GEN MsWeb "$CONFIG_JSON" "$TARGET_DIR"
 
-# Step 4: Run composer update to pick up local package
-print_step "Running composer update..."
-COMPOSER_ALLOW_SUPERUSER=1 composer update --no-interaction 2>&1 | tail -5
+# Step 3: Run composer install
+print_step "Running composer install (this may take a while)..."
+cd "$TARGET_DIR"
+COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction 2>&1 | tail -10
 
-# Step 5: Generate site configuration
+if [ ! -x "$TARGET_DIR/vendor/bin/typo3" ]; then
+    print_error "composer install did not produce vendor/bin/typo3 - aborting"
+    exit 1
+fi
+
+# Step 4: Generate site configuration
 print_step "Generating site configuration..."
 $GEN SiteConfig "$CONFIG_JSON" "$TARGET_DIR"
 
-# Step 6: Generate system settings
+# Step 5: Generate system settings
 print_step "Generating system settings..."
 $GEN Settings "$CONFIG_JSON" "$TARGET_DIR"
 
-# Step 7: Generate Docker infrastructure
+# Step 6: Generate Docker infrastructure
 print_step "Generating Docker infrastructure..."
 $GEN Docker "$CONFIG_JSON" "$TARGET_DIR"
 
-# Step 8: Generate frontend build files
+# Step 7: Generate frontend build files
 print_step "Generating frontend build files..."
 $GEN FrontendBuild "$CONFIG_JSON" "$TARGET_DIR"
 
-# Step 9: Generate project files (.gitignore, .editorconfig, .htaccess)
+# Step 8: Generate project files (.gitignore, .editorconfig, .htaccess)
 print_step "Generating project files..."
 $GEN ProjectFiles "$CONFIG_JSON" "$TARGET_DIR"
 
-# Step 10: Build frontend (optional, needs pnpm)
+# Step 9: Build frontend (optional, needs pnpm)
 if command -v pnpm >/dev/null 2>&1; then
     print_step "Installing frontend dependencies..."
     cd "$TARGET_DIR"
@@ -542,7 +541,7 @@ else
     print_warn "pnpm not found - skipping frontend build. Run 'pnpm install && pnpm build' later."
 fi
 
-# Step 11: Database setup (optional)
+# Step 10: Database setup (optional)
 if [ -z "$SETUP_DB_FLAG" ]; then
     if [ "$ASSUME_YES" = true ]; then
         SETUP_DB="n"
@@ -624,7 +623,7 @@ JSONEOF
     $GEN DatabaseSetup "$DB_CONFIG_JSON" "$TARGET_DIR"
 fi
 
-# Step 12: Git init (optional)
+# Step 11: Git init (optional)
 if [ -z "$INIT_GIT_FLAG" ]; then
     if [ "$ASSUME_YES" = true ]; then
         INIT_GIT="y"

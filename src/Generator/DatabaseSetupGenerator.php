@@ -45,11 +45,19 @@ class DatabaseSetupGenerator extends AbstractGenerator
             'MYSQL_PASSWORD' => $dbPassword,
         ]);
 
-        $this->runSchemaUpdate($targetDir, $dbHost, $dbName, $dbUser, $dbPassword, $pdo);
+        $schemaReady = $this->runTypo3Setup($targetDir, $projectName, $dbHost, $dbName, $dbUser, $dbPassword);
+
+        if (!$schemaReady) {
+            echo "  ERROR: Database schema could not be created. Skipping page tree creation.\n";
+            echo "  To finish setup manually, run:\n";
+            echo "  cd {$targetDir} && php vendor/bin/typo3 setup --no-interaction --force\n";
+            return;
+        }
+
         $this->insertPageTree($pdo, $projectName);
 
         echo "\n  To create an admin user, run:\n";
-        echo "  cd {$targetDir} && php vendor/bin/typo3 backend:createadmin\n";
+        echo "  cd {$targetDir} && php vendor/bin/typo3 setup --no-interaction --force --admin-username=admin --admin-user-password=<password> --admin-email=<email>\n";
         echo "\n  Database setup complete!\n";
     }
 
@@ -146,73 +154,75 @@ class DatabaseSetupGenerator extends AbstractGenerator
         }
     }
 
-    private function runSchemaUpdate(
+    private function runTypo3Setup(
         string $targetDir,
+        string $projectName,
         string $dbHost,
         string $dbName,
         string $dbUser,
         string $dbPassword,
-        PDO $pdo,
-    ): void {
-        echo "  Running TYPO3 database schema update...\n";
-
-        putenv('MYSQL_HOST=' . $dbHost);
-        putenv('MYSQL_DATABASE=' . $dbName);
-        putenv('MYSQL_USER=' . $dbUser);
-        putenv('MYSQL_PASSWORD=' . $dbPassword);
-        putenv('TYPO3_CONTEXT=Development');
-
+    ): bool {
         $typo3Cli = $targetDir . '/vendor/bin/typo3';
 
         if (!file_exists($typo3Cli)) {
-            echo "  WARNING: TYPO3 CLI not found at {$typo3Cli}\n";
-            echo "  Skipping schema update - run 'vendor/bin/typo3 database:updateschema' manually\n";
-            return;
+            echo "  ERROR: TYPO3 CLI not found at {$typo3Cli}\n";
+            echo "  Composer install may have failed - check the output above.\n";
+            return false;
         }
+
+        echo "  Running TYPO3 setup (creates database schema)...\n";
+
+        $settingsPath = $targetDir . '/config/system/settings.php';
+        $backupPath = $settingsPath . '.installer-backup';
+        $hasBackup = false;
+        if (file_exists($settingsPath)) {
+            copy($settingsPath, $backupPath);
+            $hasBackup = true;
+        }
+
+        putenv('TYPO3_CONTEXT=Development');
+
+        $cmd = sprintf(
+            'cd %s && php %s setup --no-interaction --force --server-type=other --driver=mysqli --host=%s --port=3306 --dbname=%s --username=%s --password=%s --project-name=%s 2>&1',
+            escapeshellarg($targetDir),
+            escapeshellarg($typo3Cli),
+            escapeshellarg($dbHost),
+            escapeshellarg($dbName),
+            escapeshellarg($dbUser),
+            escapeshellarg($dbPassword),
+            escapeshellarg($projectName),
+        );
 
         $output = [];
         $returnCode = 0;
-        exec('cd ' . escapeshellarg($targetDir) . ' && php ' . $typo3Cli . ' database:updateschema 2>&1', $output, $returnCode);
+        exec($cmd, $output, $returnCode);
+
+        if ($hasBackup) {
+            copy($backupPath, $settingsPath);
+            unlink($backupPath);
+        }
 
         if ($returnCode !== 0) {
-            echo "  WARNING: Schema update returned code {$returnCode}\n";
+            echo "  ERROR: typo3 setup failed (exit code {$returnCode})\n";
             echo '  ' . implode("\n  ", $output) . "\n";
-            $this->createMinimalPagesTable($pdo);
-        } else {
-            echo "  Database schema updated successfully\n";
+            return false;
         }
-    }
 
-    private function createMinimalPagesTable(PDO $pdo): void
-    {
-        echo "  Attempting to create pages table manually...\n";
-
-        $pdo->exec("
-            CREATE TABLE IF NOT EXISTS `pages` (
-                `uid` int(11) unsigned NOT NULL AUTO_INCREMENT,
-                `pid` int(11) DEFAULT '0' NOT NULL,
-                `tstamp` int(11) unsigned DEFAULT '0' NOT NULL,
-                `crdate` int(11) unsigned DEFAULT '0' NOT NULL,
-                `deleted` tinyint(4) unsigned DEFAULT '0' NOT NULL,
-                `hidden` tinyint(4) unsigned DEFAULT '0' NOT NULL,
-                `sorting` int(11) DEFAULT '0' NOT NULL,
-                `title` varchar(255) DEFAULT '' NOT NULL,
-                `doktype` int(11) unsigned DEFAULT '0' NOT NULL,
-                `is_siteroot` tinyint(4) unsigned DEFAULT '0' NOT NULL,
-                `slug` varchar(2048) DEFAULT '' NOT NULL,
-                `sys_language_uid` int(11) DEFAULT '0' NOT NULL,
-                `l10n_parent` int(11) unsigned DEFAULT '0' NOT NULL,
-                PRIMARY KEY (`uid`),
-                KEY `parent` (`pid`,`deleted`,`sorting`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        ");
+        echo "  Database schema created successfully\n";
+        return true;
     }
 
     private function insertPageTree(PDO $pdo, string $projectName): void
     {
         echo "  Creating initial page tree...\n";
 
-        $stmt = $pdo->query('SELECT COUNT(*) FROM `pages` WHERE `uid` IN (1, 2, 3)');
+        try {
+            $stmt = $pdo->query('SELECT COUNT(*) FROM `pages` WHERE `uid` IN (1, 2, 3)');
+        } catch (PDOException $e) {
+            echo "  WARNING: pages table not available, skipping page creation: " . $e->getMessage() . "\n";
+            return;
+        }
+
         if ($stmt === false) {
             return;
         }

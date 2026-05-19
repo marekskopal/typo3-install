@@ -27,7 +27,6 @@ class MsWebGenerator extends AbstractGenerator
         'packages/ms_web/Resources/Private/View/Page/Templates/Default.html',
         'packages/ms_web/Resources/Private/View/Page/Partials/Header.html',
         'packages/ms_web/Resources/Private/View/PageParts/Templates/Navigation.html',
-        'packages/ms_web/Resources/Private/View/Content/Layouts/Default.html',
         'packages/ms_web/Resources/Public/Javascript/main.js',
         'packages/ms_web/Resources/Private/.htaccess',
     ];
@@ -188,9 +187,6 @@ class MsWebGenerator extends AbstractGenerator
         }
 
         $footer = <<<'TYPOSCRIPT'
-            lib.contentElement.layoutRootPaths.10 = EXT:ms_web/Resources/Private/View/Content/Layouts/
-            lib.contentElement.partialRootPaths.10 = EXT:ms_web/Resources/Private/View/Content/Partials/
-
             lib.navigation {
                 dataProcessing.30 = TYPO3\CMS\Frontend\DataProcessing\LanguageMenuProcessor
                 dataProcessing.30 {
@@ -230,8 +226,6 @@ class MsWebGenerator extends AbstractGenerator
         $this->writeFile($extDir . '/Resources/Public/Css/.gitignore', "*\n!.gitignore\n");
         $this->writeFile($extDir . '/Resources/Public/Fonts/.gitignore', "*\n!.gitignore\n");
         $this->writeFile($extDir . '/Resources/Public/Icons/.gitkeep', '');
-        $this->writeFile($extDir . '/Resources/Private/View/Content/Partials/.gitkeep', '');
-        $this->writeFile($extDir . '/Resources/Private/View/Content/Templates/.gitkeep', '');
         $this->writeFile($extDir . '/Classes/.gitkeep', '');
     }
 }

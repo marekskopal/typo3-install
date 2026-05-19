@@ -64,7 +64,7 @@ class DockerGenerator extends AbstractGenerator
             FROM mlocati/php-extension-installer:2.11.1 AS php-extension-installer
             FROM composer:2.9.7 AS composer
             FROM node:24.15.0 AS node
-            ROM php:8.5.6-apache AS php
+            FROM php:8.5.6-apache AS php
 
             COPY --from=php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
 

@@ -43,20 +43,28 @@ class DockerGenerator extends AbstractGenerator
     /** @param list<string> $languages */
     private function generateDockerfile(string $targetDir, array $languages): void
     {
-        $localeSedCommands = [];
+        $localeRunLines = [];
+        $localedefLines = [];
         foreach ($languages as $lang) {
-            if (isset(self::LocaleMap[$lang])) {
-                $locale = self::LocaleMap[$lang];
-                $localeSedCommands[] = "    sed -i -e 's/# " . $locale . '/' . $locale . "/' /etc/locale.gen";
+            if (!isset(self::LocaleMap[$lang])) {
+                continue;
             }
+            $locale = self::LocaleMap[$lang];
+            $localeName = explode('.', $locale, 2)[0];
+            $localeRunLines[] = "sed -i -e 's/# {$locale}/{$locale}/' /etc/locale.gen";
+            $localedefLines[] = "localedef -i {$localeName} -f UTF-8 {$localeName}";
         }
-        $localeSedStr = implode(" && \\\n", $localeSedCommands);
+        $localeRunLines[] = 'dpkg-reconfigure --frontend=noninteractive locales';
+        foreach ($localedefLines as $line) {
+            $localeRunLines[] = $line;
+        }
+        $localeRunBlock = implode(" && \\\n    ", $localeRunLines);
 
         $content = <<<DOCKERFILE
-            FROM mlocati/php-extension-installer:2.10.16 AS php-extension-installer
+            FROM mlocati/php-extension-installer:2.11.1 AS php-extension-installer
             FROM composer:2.9.7 AS composer
             FROM node:24.15.0 AS node
-            FROM php:8.4-apache AS php
+            ROM php:8.5.6-apache AS php
 
             COPY --from=php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
 
@@ -88,8 +96,7 @@ class DockerGenerator extends AbstractGenerator
                     ghostscript && \\
                 rm -r /var/lib/apt/lists/*
 
-            RUN {$localeSedStr} && \\
-                dpkg-reconfigure --frontend=noninteractive locales
+            RUN {$localeRunBlock}
 
             COPY ./docker/php-typo3.ini /usr/local/etc/php/conf.d/php-typo3.ini
 

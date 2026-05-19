@@ -117,7 +117,7 @@ class DockerGenerator extends AbstractGenerator
             RUN npm install -g pnpm
 
             COPY ./packages/ms_web/Resources/Private/Sass/ /var/www/html/packages/ms_web/Resources/Private/Sass/
-            COPY ./package.json ./pnpm-lock.yaml ./gulpfile.js /var/www/html/
+            COPY ./package.json ./pnpm-lock.yaml ./pnpm-workspace.yaml ./gulpfile.js /var/www/html/
 
             WORKDIR /var/www/html/
 
@@ -130,7 +130,7 @@ class DockerGenerator extends AbstractGenerator
             COPY --from=build_frontend /var/www/html/packages/ms_web/Resources/Public /var/www/html/packages/ms_web/Resources/Public
 
             RUN \\
-                mkdir var && \\
+                mkdir -p var && \\
                 chown -R www-data:www-data /var/www/html/
 
             RUN service apache2 restart

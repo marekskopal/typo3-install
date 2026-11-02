@@ -156,17 +156,20 @@ done
 
 EXTENSIONS=(
     "typo3-core|marekskopal/typo3-core|^14.1|1|REQUIRED"
-    "typo3-google-font|marekskopal/typo3-google-font|^1.0|0|Google Fonts integration"
-    "typo3-fontawesome|marekskopal/typo3-fontawesome|^1.0|0|Font Awesome integration"
-    "typo3-faq|marekskopal/typo3-faq|^1.0|0|FAQ plugin"
+    "typo3-google-font|marekskopal/typo3-google-font|^1.2|0|Google Fonts integration"
+    "typo3-fontawesome|marekskopal/typo3-fontawesome|^1.1|0|Font Awesome integration"
+    "typo3-faq|marekskopal/typo3-faq|^1.1|0|FAQ plugin"
     "typo3-features|marekskopal/typo3-features|^1.0|0|Features plugin"
-    "typo3-instafeed|marekskopal/typo3-instafeed|^1.0|0|Instagram feed plugin"
+    "typo3-instafeed|marekskopal/typo3-instafeed|^3.0|0|Instagram feed plugin"
     "typo3-mailchimp|marekskopal/typo3-mailchimp|^1.0|0|Mailchimp newsletter"
     "typo3-pricing|marekskopal/typo3-pricing|^1.0|0|Pricing tables"
-    "typo3-recipe|marekskopal/typo3-recipe|^1.0|0|Recipe plugin"
-    "typo3-reference|marekskopal/typo3-reference|^1.0|0|Reference/portfolio"
+    "typo3-recipe|marekskopal/typo3-recipe|^2.1|0|Recipe plugin"
+    "typo3-reference|marekskopal/typo3-reference|^1.2|0|Reference/portfolio"
+    "typo3-team|marekskopal/typo3-team|^1.0|0|Team members list"
     "typo3-timeline|marekskopal/typo3-timeline|^1.0|0|Timeline plugin"
-    "typo3-mcp-server|marekskopal/typo3-mcp-server|^0.9.0|0|MCP server integration"
+    "typo3-darts|marekskopal/typo3-darts|^1.0|0|Darts league plugin"
+    "typo3-mcp-server|marekskopal/typo3-mcp-server|^1.4|0|MCP server integration"
+    "typo3-mcp-docs|marekskopal/typo3-mcp-docs|^1.2|0|MCP documentation plugin"
 )
 
 declare -a EXT_NAMES EXT_COMPOSERS EXT_VERSIONS EXT_SELECTED EXT_DESCRIPTIONS

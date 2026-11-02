@@ -55,7 +55,7 @@ class MsWebGenerator extends AbstractGenerator
             'name' => 'marekskopal/typo3-web',
             'type' => 'typo3-cms-extension',
             'require' => [
-                'typo3/cms-core' => '^14.3.0',
+                'typo3/cms-core' => '^14.3',
             ],
             'autoload' => [
                 'psr-4' => [

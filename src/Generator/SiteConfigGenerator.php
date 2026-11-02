@@ -20,8 +20,6 @@ class SiteConfigGenerator extends AbstractGenerator
         $machineName = $config['machine_name'];
         /** @var string $hostname */
         $hostname = $config['hostname'];
-        /** @var string $sslPort */
-        $sslPort = $config['dev_ssl_port'];
         /** @var string $projectName */
         $projectName = $config['project_name'];
         /** @var list<string> $languages */
@@ -35,7 +33,7 @@ class SiteConfigGenerator extends AbstractGenerator
 
         $dependencies = $this->buildDependencies($targetDir, $extensions);
 
-        $yaml = $this->buildYaml($hostname, $sslPort, $projectName, $orderedLangs, $dependencies);
+        $yaml = $this->buildYaml($hostname, $projectName, $orderedLangs, $dependencies);
 
         $configDir = $targetDir . '/config/sites/' . $machineName;
         if (!is_dir($configDir)) {
@@ -43,20 +41,38 @@ class SiteConfigGenerator extends AbstractGenerator
         }
 
         file_put_contents($configDir . '/config.yaml', $yaml);
+        file_put_contents($configDir . '/csp.yaml', $this->buildCsp($extensions));
+    }
+
+    /**
+     * The frontend's Content Security Policy: TYPO3's default, plus Google Fonts when that extension is installed.
+     *
+     * @param list<array{name: string, version: string}> $extensions
+     */
+    private function buildCsp(array $extensions): string
+    {
+        $yaml = "# Inherits the default frontend policy; add the sources the site's templates load from.\n";
+        $yaml .= "inheritDefault: true\n";
+        if (!$this->hasExtension($extensions, 'marekskopal/typo3-google-font')) {
+            return $yaml . "mutations: []\n";
+        }
+
+        $yaml .= "mutations:\n";
+        $yaml .= "  - mode: \"extend\"\n    directive: \"style-src\"\n    sources:\n      - \"https://fonts.googleapis.com\"\n";
+        $yaml .= "  - mode: \"extend\"\n    directive: \"font-src\"\n    sources:\n      - \"https://fonts.gstatic.com\"\n";
+
+        return $yaml;
     }
 
     /**
      * @param list<string> $orderedLangs
      * @param list<string> $dependencies
      */
-    private function buildYaml(string $hostname, string $sslPort, string $projectName, array $orderedLangs, array $dependencies): string
+    private function buildYaml(string $hostname, string $projectName, array $orderedLangs, array $dependencies): string
     {
-        $yaml = "base: /\n";
-        $yaml .= "baseVariants:\n";
-        $yaml .= sprintf("  - base: 'https://%s'\n", $hostname);
-        $yaml .= "    condition: 'applicationContext == \"Production\"'\n";
-        $yaml .= sprintf("  - base: 'https://localhost:%s'\n", $sslPort);
-        $yaml .= "    condition: 'applicationContext == \"Development\"'\n";
+        // The absolute base comes from the environment (TYPO3_BASE_URL in .env), so the same config serves production
+        // and any development host, and canonical, hreflang and sitemap URLs stay absolute.
+        $yaml = "base: '%env(TYPO3_BASE_URL)%'\n";
 
         if ($dependencies !== []) {
             $yaml .= "dependencies:\n";
@@ -75,10 +91,14 @@ class SiteConfigGenerator extends AbstractGenerator
         $yaml .= "    route: robots.txt\n";
         $yaml .= "    type: staticText\n";
         $yaml .= sprintf("    content: \"User-agent: *\\r\\nDisallow: /typo3/\\r\\nSitemap: https://%s/sitemap.xml\"\n", $hostname);
-        $yaml .= "  -\n";
-        $yaml .= "    route: sitemap.xml\n";
-        $yaml .= "    type: uri\n";
-        $yaml .= sprintf("    source: 'https://%s/?type=1533906435'\n", $hostname);
+        $yaml .= "routeEnhancers:\n";
+        $yaml .= "  PageTypeSuffix:\n";
+        $yaml .= "    type: PageType\n";
+        $yaml .= "    default: '/'\n";
+        $yaml .= "    index: ''\n";
+        $yaml .= "    map:\n";
+        $yaml .= "      '/': 0\n";
+        $yaml .= "      sitemap.xml: 1533906435\n";
         $yaml .= "languages:\n";
 
         foreach ($orderedLangs as $index => $langCode) {
@@ -90,16 +110,7 @@ class SiteConfigGenerator extends AbstractGenerator
             $yaml .= sprintf("    locale: %s\n", $lang['locale']);
             $yaml .= sprintf("    hreflang: %s\n", $lang['hreflang']);
 
-            if ($index === 0) {
-                $yaml .= "    base: /\n";
-            } else {
-                $yaml .= sprintf("    base: /%s/\n", $langCode);
-                $yaml .= "    baseVariants:\n";
-                $yaml .= sprintf("      - base: 'https://%s/%s/'\n", $hostname, $langCode);
-                $yaml .= "        condition: 'applicationContext == \"Production\"'\n";
-                $yaml .= sprintf("      - base: 'https://localhost:%s/%s/'\n", $sslPort, $langCode);
-                $yaml .= "        condition: 'applicationContext == \"Development\"'\n";
-            }
+            $yaml .= $index === 0 ? "    base: /\n" : sprintf("    base: /%s/\n", $langCode);
 
             $yaml .= sprintf("    websiteTitle: %s\n", $projectName);
             $yaml .= sprintf("    navigationTitle: %s\n", $lang['navigationTitle']);
@@ -122,7 +133,8 @@ class SiteConfigGenerator extends AbstractGenerator
      */
     private function buildDependencies(string $targetDir, array $extensions): array
     {
-        $dependencies = ['typo3/fluid-styled-content'];
+        // typo3/seo-sitemap defines the sitemap page type the PageType enhancer maps sitemap.xml to
+        $dependencies = ['typo3/fluid-styled-content', 'typo3/seo-sitemap'];
 
         $coreSet = null;
         $otherSets = [];

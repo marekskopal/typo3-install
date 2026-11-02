@@ -45,12 +45,41 @@ final class SiteConfigGeneratorTest extends TestCase
         self::assertIsString($content);
         self::assertStringContainsString('rootPageId: 1', $content);
         self::assertStringContainsString('websiteTitle: Test Web', $content);
-        self::assertStringContainsString("base: 'https://testweb.cz'", $content);
+        self::assertStringContainsString("base: '%env(TYPO3_BASE_URL)%'", $content);
+        self::assertStringNotContainsString('baseVariants', $content);
+        self::assertStringContainsString('  - typo3/seo-sitemap', $content);
+        self::assertStringContainsString('      sitemap.xml: 1533906435', $content);
+        self::assertStringContainsString("    index: ''", $content);
+        self::assertStringContainsString('    base: /en/', $content);
+        self::assertStringNotContainsString('type: uri', $content);
         self::assertStringContainsString('locale: cs_CZ', $content);
         self::assertStringContainsString('locale: en_US', $content);
         self::assertStringContainsString('languageId: 0', $content);
         self::assertStringContainsString('languageId: 1', $content);
         self::assertStringContainsString("errorContentSource: 't3://page?uid=3'", $content);
+    }
+
+    public function testCspAllowsGoogleFontsOnlyWithTheExtension(): void
+    {
+        $config = [
+            'project_name' => 'Test',
+            'machine_name' => 'test',
+            'hostname' => 'test.com',
+            'languages' => ['en'],
+            'default_language' => 'en',
+            'extensions' => [['name' => 'marekskopal/typo3-google-font', 'version' => '^1.2']],
+        ];
+
+        (new SiteConfigGenerator())->generate($config, $this->tempDir);
+        $csp = file_get_contents($this->tempDir . '/config/sites/test/csp.yaml');
+        self::assertIsString($csp);
+        self::assertStringContainsString('inheritDefault: true', $csp);
+        self::assertStringContainsString('https://fonts.gstatic.com', $csp);
+
+        (new SiteConfigGenerator())->generate([...$config, 'extensions' => []], $this->tempDir);
+        $csp = file_get_contents($this->tempDir . '/config/sites/test/csp.yaml');
+        self::assertIsString($csp);
+        self::assertStringNotContainsString('fonts.googleapis.com', $csp);
     }
 
     public function testDefaultLanguageIsFirst(): void

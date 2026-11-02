@@ -52,6 +52,9 @@ Options:
       --ssl-key <path>           Dev SSL private key for the proxy
                                  (default: ./ssl/server.key)
   -t, --target-dir <path>        Target directory (default: \$PWD/<machine-name>)
+      --skip-docker              Leave out docker-compose.yml and the proxy, for a
+                                 project going into an existing Docker stack (the
+                                 Dockerfile, docker/ and .env are still written)
       --mcp-base-path <path>     Path of the MCP endpoint when typo3-mcp-server is
                                  selected (default: /mcp; e.g. /typo3-web/mcp when
                                  /mcp belongs to another app on the same host)
@@ -108,6 +111,7 @@ SETUP_DB_FLAG=""
 CLI_DB_NAME=""
 CLI_DB_HOST=""
 CLI_DB_PORT=""
+SKIP_DOCKER=false
 MCP_BASE_PATH=""
 CLI_DB_USER=""
 CLI_DB_PASSWORD=""
@@ -145,6 +149,7 @@ while [ $# -gt 0 ]; do
         --db-name) require_value "$1" "$2"; CLI_DB_NAME="$2"; shift 2;;
         --db-host) require_value "$1" "$2"; CLI_DB_HOST="$2"; shift 2;;
         --db-port) require_value "$1" "$2"; CLI_DB_PORT="$2"; shift 2;;
+        --skip-docker) SKIP_DOCKER=true; shift;;
         --mcp-base-path) require_value "$1" "$2"; MCP_BASE_PATH="$2"; shift 2;;
         --db-user) require_value "$1" "$2"; CLI_DB_USER="$2"; shift 2;;
         --db-password) CLI_DB_PASSWORD="${2:-}"; CLI_DB_PASSWORD_SET=true; shift 2;;
@@ -541,6 +546,7 @@ CONFIG_JSON=$(cat <<JSONEOF
     "extensions": $SELECTED_EXT_JSON,
     "languages": $LANGS_JSON,
     "default_language": "$DEFAULT_LANG",
+    "skip_docker": $SKIP_DOCKER,
     "mcp_base_path": "$(json_escape "$MCP_BASE_PATH")"
 }
 JSONEOF
@@ -595,7 +601,8 @@ if command -v pnpm >/dev/null 2>&1; then
     print_step "Building SCSS..."
     pnpm build 2>&1 | tail -3
 else
-    print_warn "pnpm not found - skipping frontend build. Run 'pnpm install && pnpm build' later."
+    print_warn "pnpm not found - skipping frontend build. Run 'pnpm install && pnpm build' later:"
+    print_warn "it also writes pnpm-lock.yaml; until then the Docker image installs the frontend tools unlocked."
 fi
 
 # Step 10: Database setup (optional)
@@ -756,9 +763,15 @@ echo "Project created in: $TARGET_DIR"
 echo ""
 echo "Next steps:"
 echo "  1. cd $TARGET_DIR"
-echo "  2. Copy .env.example to .env and adjust values"
-echo "  3. docker compose up -d"
-echo "  4. Access TYPO3 at https://localhost:$DEV_SSL_PORT/typo3"
+if [ "$SKIP_DOCKER" = true ]; then
+    echo "  2. Add a web service built from this directory's Dockerfile to your stack, with the variables of .env"
+    echo "     (MYSQL_*, TYPO3_BASE_URL, TYPO3_ENCRYPTION_KEY, TYPO3_CONTEXT, REVERSE_PROXY_IP)"
+    echo "  3. Route the site (and, with typo3-mcp-server, its MCP path and /.well-known/oauth-*<path>) to it"
+else
+    echo "  2. Check .env (the database, TYPO3_BASE_URL) and put a certificate at PROXY_SSL_CERT / PROXY_SSL_KEY"
+    echo "  3. docker compose up -d --build"
+    echo "  4. Access TYPO3 at https://localhost:$DEV_SSL_PORT/typo3"
+fi
 echo ""
 if [ "$SETUP_DB" != "y" ]; then
     echo "  Database setup was skipped. To set up later:"

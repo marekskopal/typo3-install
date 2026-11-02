@@ -1,0 +1,11 @@
+/vendor
+/node_modules
+/var
+/log
+/.env
+/ssl
+/public/*
+!/public/.htaccess
+!/public/fileadmin/
+/public/fileadmin/*
+!/public/fileadmin/.htaccess

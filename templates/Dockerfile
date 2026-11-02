@@ -58,7 +58,8 @@ FROM node AS build_frontend
 RUN npm install -g pnpm
 
 COPY ./packages/ms_web/Resources/Private/Sass/ /var/www/html/packages/ms_web/Resources/Private/Sass/
-COPY ./package.json ./pnpm-lock.yaml ./pnpm-workspace.yaml ./gulpfile.js /var/www/html/
+# pnpm-lock.yaml is matched by the glob, so a project generated without pnpm still builds (unlocked)
+COPY ./package.json ./pnpm-*.yaml ./gulpfile.js /var/www/html/
 
 WORKDIR /var/www/html/
 
@@ -74,4 +75,7 @@ RUN \
     mkdir -p var/log && \
     chown -R www-data:www-data /var/www/html/
 
-RUN service apache2 restart
+COPY --chmod=755 ./docker/entrypoint.sh /usr/local/bin/web-entrypoint
+
+ENTRYPOINT ["web-entrypoint"]
+CMD ["apache2-foreground"]

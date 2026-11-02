@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MarekSkopal\Typo3Install\Generator;
 
+use const PASSWORD_ARGON2I;
+
 class DockerGenerator extends AbstractGenerator
 {
     private const LocaleMap = [
@@ -19,6 +21,11 @@ class DockerGenerator extends AbstractGenerator
     private const StaticFiles = [
         'docker/php-typo3.ini',
         'docker/vhost.conf',
+        'docker/entrypoint.sh',
+    ];
+
+    /** The standalone stack: an nginx proxy with TLS in front of the web container. */
+    private const StackFiles = [
         'proxy/Dockerfile',
         'proxy/conf/default.conf.template',
     ];
@@ -36,13 +43,24 @@ class DockerGenerator extends AbstractGenerator
         $sslCert = is_string($config['dev_ssl_cert'] ?? null) ? $config['dev_ssl_cert'] : self::DefaultSslCert;
         $sslKey = is_string($config['dev_ssl_key'] ?? null) ? $config['dev_ssl_key'] : self::DefaultSslKey;
 
+        /** @var string $hostname */
+        $hostname = $config['hostname'];
+        // An existing stack (--skip-docker) brings its own compose file and proxy; the image and .env are still needed.
+        $skipStack = ($config['skip_docker'] ?? false) === true;
+
         foreach (self::StaticFiles as $file) {
             $this->copyTemplate($file, $targetDir);
         }
+        $this->copyTemplate('dockerignore', $targetDir, '.dockerignore');
 
         $this->generateDockerfile($targetDir, $languages);
-        $this->generateDockerCompose($targetDir, $machineName);
-        $this->generateEnvFiles($targetDir, $machineName, $httpPort, $sslPort, $sslCert, $sslKey);
+        if (!$skipStack) {
+            foreach (self::StackFiles as $file) {
+                $this->copyTemplate($file, $targetDir);
+            }
+            $this->generateDockerCompose($targetDir, $machineName);
+        }
+        $this->generateEnvFiles($targetDir, $machineName, $hostname, $httpPort, $sslPort, $sslCert, $sslKey);
     }
 
     /** @param list<string> $languages */
@@ -80,6 +98,7 @@ class DockerGenerator extends AbstractGenerator
     private function generateEnvFiles(
         string $targetDir,
         string $machineName,
+        string $hostname,
         string $httpPort,
         string $sslPort,
         string $sslCert,
@@ -89,10 +108,17 @@ class DockerGenerator extends AbstractGenerator
         $variables = [
             'httpPort' => $httpPort,
             'sslPort' => $sslPort,
+            'hostname' => $hostname,
             'dbName' => str_replace('-', '_', $machineName),
         ];
 
-        $this->writeTemplate('env', $targetDir . '/.env', [...$variables, 'sslCert' => $sslCert, 'sslKey' => $sslKey]);
+        $this->writeTemplate('env', $targetDir . '/.env', [
+            ...$variables,
+            'sslCert' => $sslCert,
+            'sslKey' => $sslKey,
+            'encryptionKey' => bin2hex(random_bytes(48)),
+            'installToolPassword' => password_hash(bin2hex(random_bytes(16)), PASSWORD_ARGON2I),
+        ]);
         $this->writeTemplate('env.example', $targetDir . '/.env.example', $variables);
     }
 }

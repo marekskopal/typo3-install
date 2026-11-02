@@ -65,7 +65,11 @@ Options:
       --setup-db                 Run database setup after scaffolding
       --no-setup-db              Skip database setup
       --db-name <name>           Database name (default: derived from machine name)
-      --db-host <host>           Database host (default: 127.0.0.1)
+      --db-host <host>           Database host (default: 127.0.0.1). A service name
+                                 (e.g. "db") when run in a container on the
+                                 database's network; .env gets the host as the
+                                 site's container sees it.
+      --db-port <port>           Database port (default: 3306)
       --db-user <user>           Database user (default: root)
       --db-password <pass>       Database password (default: empty)
       --admin-username <name>    Admin backend user (default: admin)
@@ -103,6 +107,7 @@ CLI_DEFAULT_LANG=""
 SETUP_DB_FLAG=""
 CLI_DB_NAME=""
 CLI_DB_HOST=""
+CLI_DB_PORT=""
 MCP_BASE_PATH=""
 CLI_DB_USER=""
 CLI_DB_PASSWORD=""
@@ -139,6 +144,7 @@ while [ $# -gt 0 ]; do
         --no-setup-db) SETUP_DB_FLAG="n"; shift;;
         --db-name) require_value "$1" "$2"; CLI_DB_NAME="$2"; shift 2;;
         --db-host) require_value "$1" "$2"; CLI_DB_HOST="$2"; shift 2;;
+        --db-port) require_value "$1" "$2"; CLI_DB_PORT="$2"; shift 2;;
         --mcp-base-path) require_value "$1" "$2"; MCP_BASE_PATH="$2"; shift 2;;
         --db-user) require_value "$1" "$2"; CLI_DB_USER="$2"; shift 2;;
         --db-password) CLI_DB_PASSWORD="${2:-}"; CLI_DB_PASSWORD_SET=true; shift 2;;
@@ -598,7 +604,7 @@ if [ -z "$SETUP_DB_FLAG" ]; then
         SETUP_DB="n"
     else
         echo ""
-        read -p "Set up database now? (requires running MySQL) (y/n) [n]: " SETUP_DB
+        read -p "Set up database now? (requires a running MySQL/MariaDB reachable from here) (y/n) [n]: " SETUP_DB
     fi
 else
     SETUP_DB="$SETUP_DB_FLAG"
@@ -608,6 +614,7 @@ if [ "$SETUP_DB" = "y" ]; then
 
     DB_NAME="$CLI_DB_NAME"
     DB_HOST="$CLI_DB_HOST"
+    DB_PORT="$CLI_DB_PORT"
     DB_USER="$CLI_DB_USER"
     if [ "$CLI_DB_PASSWORD_SET" = true ]; then
         DB_PASSWORD="$CLI_DB_PASSWORD"
@@ -620,6 +627,7 @@ if [ "$SETUP_DB" = "y" ]; then
     if [ "$ASSUME_YES" = true ]; then
         [ -z "$DB_NAME" ] && DB_NAME="$DEFAULT_DB_NAME"
         [ -z "$DB_HOST" ] && DB_HOST="127.0.0.1"
+        [ -z "$DB_PORT" ] && DB_PORT="3306"
         [ -z "$DB_USER" ] && DB_USER="root"
         [ "$DB_PASSWORD_SET" = false ] && DB_PASSWORD=""
     else
@@ -631,6 +639,10 @@ if [ "$SETUP_DB" = "y" ]; then
         if [ -z "$DB_HOST" ]; then
             read -p "Database host [127.0.0.1]: " DB_HOST
             DB_HOST=${DB_HOST:-127.0.0.1}
+        fi
+        if [ -z "$DB_PORT" ]; then
+            read -p "Database port [3306]: " DB_PORT
+            DB_PORT=${DB_PORT:-3306}
         fi
         if [ -z "$DB_USER" ]; then
             read -p "Database user [root]: " DB_USER
@@ -700,6 +712,7 @@ if [ "$SETUP_DB" = "y" ]; then
     "default_language": "$DEFAULT_LANG",
     "db_name": "$DB_NAME_ESC",
     "db_host": "$DB_HOST_ESC",
+    "db_port": "$(json_escape "$DB_PORT")",
     "db_user": "$DB_USER_ESC",
     "db_password": "$DB_PASSWORD_ESC",
     "admin_username": "$ADMIN_USERNAME_ESC",

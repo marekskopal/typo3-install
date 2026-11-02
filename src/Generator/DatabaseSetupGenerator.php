@@ -32,23 +32,27 @@ class DatabaseSetupGenerator extends AbstractGenerator
         $dbPassword = $this->stringFromConfig($config, 'db_password')
             ?? ($envVars['MYSQL_PASSWORD'] ?? $this->getEnvString('MYSQL_PASSWORD', ''));
 
-        if ($dbHost === 'host.docker.internal') {
-            $dbHost = '127.0.0.1';
-        }
+        $dbPort = (int) ($this->stringFromConfig($config, 'db_port')
+            ?? ($envVars['MYSQL_PORT'] ?? $this->getEnvString('MYSQL_PORT', '3306')));
+
+        // The installer runs on the host (or in a container next to the database); the site runs in its container.
+        $connectHost = $dbHost === 'host.docker.internal' ? '127.0.0.1' : $dbHost;
 
         echo sprintf("  Database: %s\n", $dbName);
-        echo sprintf("  Host: %s\n", $dbHost);
+        echo sprintf("  Host: %s:%d\n", $connectHost, $dbPort);
         echo sprintf("  User: %s\n", $dbUser);
 
-        $pdo = $this->connectAndCreateDatabase($dbHost, $dbUser, $dbPassword, $dbName);
+        $pdo = $this->connectAndCreateDatabase($connectHost, $dbPort, $dbUser, $dbPassword, $dbName);
 
         $this->updateEnvFile($targetDir . '/.env', [
+            'MYSQL_HOST' => self::containerHost($dbHost),
+            'MYSQL_PORT' => (string) $dbPort,
             'MYSQL_DATABASE' => $dbName,
             'MYSQL_USER' => $dbUser,
             'MYSQL_PASSWORD' => $dbPassword,
         ]);
 
-        $schemaReady = $this->runTypo3Setup($targetDir, $projectName, $dbHost, $dbName, $dbUser, $dbPassword);
+        $schemaReady = $this->runTypo3Setup($targetDir, $projectName, $connectHost, $dbPort, $dbName, $dbUser, $dbPassword);
 
         if (!$schemaReady) {
             echo "  ERROR: Database schema could not be created. Skipping page tree creation.\n";
@@ -57,17 +61,33 @@ class DatabaseSetupGenerator extends AbstractGenerator
             return;
         }
 
-        $this->insertPageTree($pdo, $projectName);
-        $this->insertSysFileStorage($pdo);
-
+        // The admin first, so the pages can be owned by it.
+        $adminUid = 0;
         $adminUsername = $this->stringFromConfig($config, 'admin_username');
         $adminEmail = $this->stringFromConfig($config, 'admin_email');
         $adminPassword = $this->stringFromConfig($config, 'admin_password');
         if ($adminUsername !== null && $adminUsername !== '' && $adminPassword !== null && $adminPassword !== '') {
-            $this->insertBeUser($pdo, $adminUsername, $adminEmail ?? '', $adminPassword);
+            $adminUid = $this->insertBeUser($pdo, $adminUsername, $adminEmail ?? '', $adminPassword);
         }
 
+        /** @var list<string> $languages */
+        $languages = is_array($config['languages'] ?? null) ? $config['languages'] : [];
+        $defaultLanguage = $this->stringFromConfig($config, 'default_language') ?? ($languages[0] ?? '');
+        $translations = count(array_filter($languages, static fn(string $lang): bool => $lang !== $defaultLanguage));
+
+        $this->insertPageTree($pdo, $projectName, $adminUid, $translations);
+        $this->insertSysFileStorage($pdo);
+
         echo "\n  Database setup complete!\n";
+    }
+
+    /**
+     * The database host as the site's container sees it: the host machine's own address becomes
+     * host.docker.internal, a service name on a shared network (e.g. "db") stays as it is.
+     */
+    public static function containerHost(string $host): string
+    {
+        return in_array($host, ['127.0.0.1', 'localhost', '::1'], true) ? 'host.docker.internal' : $host;
     }
 
     /** @param array<string, mixed> $config */
@@ -139,10 +159,10 @@ class DatabaseSetupGenerator extends AbstractGenerator
         return $value !== false ? $value : $default;
     }
 
-    private function connectAndCreateDatabase(string $host, string $user, string $password, string $dbName): PDO
+    private function connectAndCreateDatabase(string $host, int $port, string $user, string $password, string $dbName): PDO
     {
         try {
-            $dsn = sprintf('mysql:host=%s;port=3306;charset=utf8mb4', $host);
+            $dsn = sprintf('mysql:host=%s;port=%d;charset=utf8mb4', $host, $port);
             $pdo = new PDO($dsn, $user, $password, [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             ]);
@@ -167,6 +187,7 @@ class DatabaseSetupGenerator extends AbstractGenerator
         string $targetDir,
         string $projectName,
         string $dbHost,
+        int $dbPort,
         string $dbName,
         string $dbUser,
         string $dbPassword,
@@ -192,10 +213,11 @@ class DatabaseSetupGenerator extends AbstractGenerator
         putenv('TYPO3_CONTEXT=Development');
 
         $cmd = sprintf(
-            'cd %s && php %s setup --no-interaction --force --server-type=other --driver=mysqli --host=%s --port=3306 --dbname=%s --username=%s --password=%s --project-name=%s 2>&1',
+            'cd %s && php %s setup --no-interaction --force --server-type=other --driver=mysqli --host=%s --port=%d --dbname=%s --username=%s --password=%s --project-name=%s 2>&1',
             escapeshellarg($targetDir),
             escapeshellarg($typo3Cli),
             escapeshellarg($dbHost),
+            $dbPort,
             escapeshellarg($dbName),
             escapeshellarg($dbUser),
             escapeshellarg($dbPassword),
@@ -221,7 +243,12 @@ class DatabaseSetupGenerator extends AbstractGenerator
         return true;
     }
 
-    private function insertPageTree(PDO $pdo, string $projectName): void
+    /**
+     * The root page, the Information folder and its 404 page, owned by the admin with TYPO3's default permissions
+     * (as a page created in the backend gets them), and their translation into each further site language, which
+     * a page needs to be reachable (and the 404 handler of that language to find its error page).
+     */
+    private function insertPageTree(PDO $pdo, string $projectName, int $ownerUid, int $translations): void
     {
         echo "  Creating initial page tree...\n";
 
@@ -245,8 +272,11 @@ class DatabaseSetupGenerator extends AbstractGenerator
         $now = time();
 
         $stmt = $pdo->prepare('
-            INSERT INTO `pages` (`uid`, `pid`, `tstamp`, `crdate`, `sorting`, `title`, `doktype`, `is_siteroot`, `slug`, `hidden`)
-            VALUES (:uid, :pid, :tstamp, :crdate, :sorting, :title, :doktype, :is_siteroot, :slug, :hidden)
+            INSERT INTO `pages` (`uid`, `pid`, `tstamp`, `crdate`, `sorting`, `title`, `doktype`, `is_siteroot`, `slug`,
+                `hidden`, `sys_language_uid`, `l10n_parent`, `l10n_source`, `perms_userid`, `perms_groupid`, `perms_user`,
+                `perms_group`, `perms_everybody`)
+            VALUES (:uid, :pid, :tstamp, :crdate, :sorting, :title, :doktype, :is_siteroot, :slug,
+                0, :sys_language_uid, :l10n_parent, :l10n_parent, :perms_userid, 0, 31, 27, 0)
         ');
 
         $pages = [
@@ -255,20 +285,29 @@ class DatabaseSetupGenerator extends AbstractGenerator
             ['uid' => 3, 'pid' => 2, 'title' => '404', 'doktype' => 1, 'is_siteroot' => 0, 'slug' => '/information/404'],
         ];
 
+        $nextUid = count($pages) + 1;
         foreach ($pages as $page) {
-            $stmt->execute([
-                'uid' => $page['uid'],
-                'pid' => $page['pid'],
-                'tstamp' => $now,
-                'crdate' => $now,
-                'sorting' => 256,
-                'title' => $page['title'],
-                'doktype' => $page['doktype'],
-                'is_siteroot' => $page['is_siteroot'],
-                'slug' => $page['slug'],
-                'hidden' => 0,
-            ]);
-            echo sprintf("  Page uid=%d: '%s' created\n", $page['uid'], $page['title']);
+            $rows = [[...$page, 'sys_language_uid' => 0, 'l10n_parent' => 0]];
+            for ($languageId = 1; $languageId <= $translations; $languageId++) {
+                $rows[] = [...$page, 'uid' => $nextUid, 'sys_language_uid' => $languageId, 'l10n_parent' => $page['uid']];
+                $nextUid++;
+            }
+
+            foreach ($rows as $row) {
+                $stmt->execute([
+                    ...$row,
+                    'tstamp' => $now,
+                    'crdate' => $now,
+                    'sorting' => 256,
+                    'perms_userid' => $ownerUid,
+                ]);
+                echo sprintf(
+                    "  Page uid=%d: '%s'%s created\n",
+                    $row['uid'],
+                    $row['title'],
+                    $row['sys_language_uid'] > 0 ? sprintf(' (language %d)', $row['sys_language_uid']) : '',
+                );
+            }
         }
     }
 
@@ -322,21 +361,24 @@ class DatabaseSetupGenerator extends AbstractGenerator
         echo "  sys_file_storage 'fileadmin' created\n";
     }
 
-    private function insertBeUser(PDO $pdo, string $username, string $email, string $password): void
+    /** @return int The admin's uid (0 when it could not be created) */
+    private function insertBeUser(PDO $pdo, string $username, string $email, string $password): int
     {
         echo sprintf("  Creating admin backend user '%s'...\n", $username);
 
         try {
-            $stmt = $pdo->prepare('SELECT COUNT(*) FROM `be_users` WHERE `username` = :username AND `deleted` = 0');
+            $pdo->query('SELECT 1 FROM `be_users` LIMIT 1');
         } catch (PDOException $e) {
             echo '  WARNING: be_users table not available, skipping admin user creation: ' . $e->getMessage() . "\n";
-            return;
+            return 0;
         }
 
+        $stmt = $pdo->prepare('SELECT `uid` FROM `be_users` WHERE `username` = :username AND `deleted` = 0');
         $stmt->execute(['username' => $username]);
-        if ((int) $stmt->fetchColumn() > 0) {
+        $existingUid = (int) $stmt->fetchColumn();
+        if ($existingUid > 0) {
             echo sprintf("  be_user '%s' already exists, skipping admin user creation\n", $username);
-            return;
+            return $existingUid;
         }
 
         $hash = password_hash($password, PASSWORD_ARGON2I);
@@ -360,5 +402,7 @@ class DatabaseSetupGenerator extends AbstractGenerator
         ]);
 
         echo sprintf("  Admin be_user '%s' created\n", $username);
+
+        return (int) $pdo->lastInsertId();
     }
 }

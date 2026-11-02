@@ -1,3 +1,5 @@
+@use "variables" as *;
+
 h1, .h1 {
     font-family: $font-family-body;
     font-size: $h1-font-size;

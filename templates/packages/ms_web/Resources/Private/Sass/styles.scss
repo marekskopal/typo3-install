@@ -1,7 +1,12 @@
-@import "basic";
-@import "mixins";
-@import "header";
-@import "footer";
+// Foundations: variables and mixins are loaded by each partial that uses them
+@use "variables" as *;
+@use "mixins" as *;
+@use "reset";
+@use "typo";
+
+// Site chrome
+@use "header";
+@use "footer";
 
 html {
     scroll-behavior: smooth;

@@ -20,7 +20,6 @@ class MsWebGenerator extends AbstractGenerator
         'packages/ms_web/Resources/Private/Sass/_mixins.scss',
         'packages/ms_web/Resources/Private/Sass/_reset.scss',
         'packages/ms_web/Resources/Private/Sass/_typo.scss',
-        'packages/ms_web/Resources/Private/Sass/_basic.scss',
         'packages/ms_web/Resources/Private/Sass/_header.scss',
         'packages/ms_web/Resources/Private/Sass/_footer.scss',
         'packages/ms_web/Resources/Private/Sass/styles.scss',

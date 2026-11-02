@@ -23,7 +23,7 @@ $EM_CONF[$_EXTKEY] = [
     'CGLcompliance_note' => '',
     'constraints' => [
         'depends' => [
-'ms_core' => '1.0.0',
+            'ms_core' => '1.0.0',
         ],
         'conflicts' =>[
         ],

@@ -27,6 +27,5 @@
 /ssl
 
 docker-compose.override.yml
-/config/system/settings.php
 /.claude-legito/
 /.playwright-mcp/

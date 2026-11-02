@@ -3,7 +3,7 @@
 return [
     'BE' => [
         'debug' => false,
-        'installToolPassword' => '{{installToolPassword}}',
+        'installToolPassword' => '',
         'passwordHashing' => [
             'className' => 'TYPO3\CMS\Core\Crypto\PasswordHashing\Argon2iPasswordHash',
             'options' => [],
@@ -44,7 +44,7 @@ return [
         'extensionmanager' => [
             'automaticInstallation' => '1',
             'offlineMode' => '0',
-        ],
+        ],{{mcpServer}}
     ],
     'FE' => [
         'cacheHash' => [
@@ -81,7 +81,7 @@ return [
         ],
     ],
     'MAIL' => [
-        'defaultMailFromAddress' => 'noreply@{{hostname}}',
+        'defaultMailFromAddress' => 'noreply@{{mailDomain}}',
         'transport' => 'smtp',
         'transport_sendmail_command' => '/usr/sbin/sendmail -t -i ',
         'transport_smtp_encrypt' => 'ssl',
@@ -118,7 +118,7 @@ return [
         ],
         'devIPmask' => '',
         'displayErrors' => (string)getenv('TYPO3_CONTEXT') === 'Development' ? 1 : 0,
-        'encryptionKey' => '{{encryptionKey}}',
+        'encryptionKey' => '',
         'exceptionalErrors' => 4096,
         'features' => [
             'security.backend.enforceContentSecurityPolicy' => true,
@@ -127,11 +127,10 @@ return [
             'security.frontend.reportContentSecurityPolicy' => true,
         ],
         'sitename' => '{{projectName}}',
-        'systemMaintainers' => [
-            1,
-        ],
+        // Empty: every admin is a system maintainer (uid 1 is the _cli_ user `typo3 setup` creates).
+        'systemMaintainers' => [],
         'reverseProxyIP' => (string)getenv('REVERSE_PROXY_IP'),
         'reverseProxyHeaderMultiValue' => 'last',
-        'reverseProxySSL' => '*',
+        'reverseProxySSL' => '',
     ],
 ];

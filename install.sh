@@ -52,6 +52,9 @@ Options:
       --ssl-key <path>           Dev SSL private key for the proxy
                                  (default: ./ssl/server.key)
   -t, --target-dir <path>        Target directory (default: \$PWD/<machine-name>)
+      --mcp-base-path <path>     Path of the MCP endpoint when typo3-mcp-server is
+                                 selected (default: /mcp; e.g. /typo3-web/mcp when
+                                 /mcp belongs to another app on the same host)
   -e, --extensions <list>        Comma-separated extension names to enable
                                  (e.g. "fontawesome,faq"). The typo3- prefix
                                  is optional. typo3-core is always included.
@@ -100,6 +103,7 @@ CLI_DEFAULT_LANG=""
 SETUP_DB_FLAG=""
 CLI_DB_NAME=""
 CLI_DB_HOST=""
+MCP_BASE_PATH=""
 CLI_DB_USER=""
 CLI_DB_PASSWORD=""
 CLI_DB_PASSWORD_SET=false
@@ -135,6 +139,7 @@ while [ $# -gt 0 ]; do
         --no-setup-db) SETUP_DB_FLAG="n"; shift;;
         --db-name) require_value "$1" "$2"; CLI_DB_NAME="$2"; shift 2;;
         --db-host) require_value "$1" "$2"; CLI_DB_HOST="$2"; shift 2;;
+        --mcp-base-path) require_value "$1" "$2"; MCP_BASE_PATH="$2"; shift 2;;
         --db-user) require_value "$1" "$2"; CLI_DB_USER="$2"; shift 2;;
         --db-password) CLI_DB_PASSWORD="${2:-}"; CLI_DB_PASSWORD_SET=true; shift 2;;
         --admin-username) require_value "$1" "$2"; CLI_ADMIN_USERNAME="$2"; shift 2;;
@@ -529,7 +534,8 @@ CONFIG_JSON=$(cat <<JSONEOF
     "target_dir": "$TARGET_DIR",
     "extensions": $SELECTED_EXT_JSON,
     "languages": $LANGS_JSON,
-    "default_language": "$DEFAULT_LANG"
+    "default_language": "$DEFAULT_LANG",
+    "mcp_base_path": "$(json_escape "$MCP_BASE_PATH")"
 }
 JSONEOF
 )

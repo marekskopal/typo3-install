@@ -45,7 +45,8 @@ The installer will prompt for:
 - **Project name** and **hostname**
 - **Target directory**
 - **Development ports** (HTTP/HTTPS)
-- **Extensions** to include (multi-select from available `marekskopal/*` extensions)
+- **Development SSL certificate and key** for the nginx proxy
+- **Extensions** to include (multi-select from the [available extensions](#available-extensions))
 - **Languages** (cs, en, de) and default language
 - **Database setup** (optional, requires running MySQL)
 - **Git init**
@@ -87,6 +88,41 @@ Run `./install.sh --help` for the full reference.
 
 Flags and prompts can be mixed: any value provided via a flag skips its prompt, and the rest are asked interactively as usual.
 
+### Available extensions
+
+`typo3-core` is always installed; the rest are optional. Each one is required with a `^major.minor` constraint at its latest release, so Composer installs the newest compatible version.
+
+| Extension | Description |
+|-----------|-------------|
+| `typo3-core` | Core plugin (required; pulls in news and ke_search) |
+| `typo3-google-font` | Google Fonts integration |
+| `typo3-fontawesome` | Font Awesome integration |
+| `typo3-faq` | FAQ plugin |
+| `typo3-features` | Features plugin |
+| `typo3-instafeed` | Instagram feed plugin |
+| `typo3-mailchimp` | Mailchimp newsletter |
+| `typo3-pricing` | Pricing tables |
+| `typo3-recipe` | Recipe plugin |
+| `typo3-reference` | Reference/portfolio |
+| `typo3-team` | Team members list |
+| `typo3-timeline` | Timeline plugin |
+| `typo3-darts` | Darts league plugin |
+| `typo3-mcp-server` | MCP server integration |
+| `typo3-mcp-docs` | MCP documentation plugin |
+
+All extensions are published under `marekskopal/` on Packagist. `./install.sh --list-extensions` prints the current list.
+
+### Development SSL certificate
+
+The nginx proxy serves the site over HTTPS on the dev SSL port and needs a certificate and private key. Point `--ssl-cert` / `--ssl-key` at an existing pair, or place one at the defaults `./ssl/server.crt` and `./ssl/server.key` inside the generated project. The paths are written to `.env` (`PROXY_SSL_CERT` / `PROXY_SSL_KEY`), and `/ssl` is git-ignored so the key is never committed.
+
+A self-signed pair for local development can be created with:
+
+```sh
+mkdir -p ssl && openssl req -x509 -newkey rsa:2048 -nodes -days 825 \
+    -keyout ssl/server.key -out ssl/server.crt -subj "/CN=localhost"
+```
+
 ### Generated project structure
 
 ```
@@ -96,11 +132,27 @@ project/
 │   ├── sites/{name}/         # Site configuration with languages
 │   └── system/               # System settings (DB, mail, caching)
 ├── public/                   # Web root
+│   ├── .htaccess             # TYPO3 v14.3 Apache rules
+│   └── fileadmin/.htaccess   # CSP hardening for user uploads (default file storage)
+├── docker/                   # Apache vhost and PHP ini for the web image
+├── proxy/                    # nginx reverse proxy with TLS
 ├── docker-compose.yml        # Docker setup (nginx proxy + PHP/Apache)
 ├── Dockerfile                # Multi-stage build (PHP, Composer, Node/SCSS)
+├── .env / .env.example       # Ports, SSL cert paths, database and SMTP settings
 ├── package.json              # Gulp + SCSS build pipeline
 └── composer.json             # TYPO3 v14.3 dependencies
 ```
+
+### Docker stack
+
+| Component | Image |
+|-----------|-------|
+| Web | `php:8.5.12-apache` with `mlocati/php-extension-installer:2.13.2` |
+| Composer | `composer:2.11.1` |
+| Frontend build | `node:24.22.2` (pnpm, Gulp, Sass) |
+| Proxy | `nginx:1.31.8-alpine` |
+
+The proxy terminates TLS 1.3 and sends HSTS, `Referrer-Policy`, `X-Frame-Options` and `X-Content-Type-Options` headers on every response.
 
 ## Development
 
@@ -127,3 +179,7 @@ Tests:
 ```sh
 vendor/bin/phpunit
 ```
+
+### Templates
+
+Generated files live in `templates/`. Static files are copied as-is; files with `{{name}}` placeholders (for example `Dockerfile`, `docker-compose.yml`, `env`, `config/system/settings.php`) are filled in by `AbstractGenerator::renderTemplate()`. Reusable snippets that are inserted into other templates live in `templates/fragments/`. Edit the template files rather than the generator classes when changing generated content.

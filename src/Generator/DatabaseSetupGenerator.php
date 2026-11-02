@@ -6,6 +6,9 @@ namespace MarekSkopal\Typo3Install\Generator;
 
 use PDO;
 use PDOException;
+use const FILE_IGNORE_NEW_LINES;
+use const FILE_SKIP_EMPTY_LINES;
+use const PASSWORD_ARGON2I;
 
 class DatabaseSetupGenerator extends AbstractGenerator
 {
@@ -33,9 +36,9 @@ class DatabaseSetupGenerator extends AbstractGenerator
             $dbHost = '127.0.0.1';
         }
 
-        echo "  Database: {$dbName}\n";
-        echo "  Host: {$dbHost}\n";
-        echo "  User: {$dbUser}\n";
+        echo sprintf("  Database: %s\n", $dbName);
+        echo sprintf("  Host: %s\n", $dbHost);
+        echo sprintf("  User: %s\n", $dbUser);
 
         $pdo = $this->connectAndCreateDatabase($dbHost, $dbUser, $dbPassword, $dbName);
 
@@ -50,7 +53,7 @@ class DatabaseSetupGenerator extends AbstractGenerator
         if (!$schemaReady) {
             echo "  ERROR: Database schema could not be created. Skipping page tree creation.\n";
             echo "  To finish setup manually, run:\n";
-            echo "  cd {$targetDir} && php vendor/bin/typo3 setup --no-interaction --force\n";
+            echo sprintf("  cd %s && php vendor/bin/typo3 setup --no-interaction --force\n", $targetDir);
             return;
         }
 
@@ -93,11 +96,9 @@ class DatabaseSetupGenerator extends AbstractGenerator
         foreach ($values as $key => $value) {
             $pattern = '/^' . preg_quote($key, '/') . '=.*$/m';
             $replacement = $key . '=' . $value;
-            if (preg_match($pattern, $contents) === 1) {
-                $contents = preg_replace($pattern, $replacement, $contents) ?? $contents;
-            } else {
-                $contents = rtrim($contents, "\n") . "\n" . $replacement . "\n";
-            }
+            $contents = preg_match($pattern, $contents) === 1
+                ? preg_replace($pattern, $replacement, $contents) ?? $contents
+                : rtrim($contents, "\n") . "\n" . $replacement . "\n";
         }
 
         file_put_contents($path, $contents);
@@ -120,10 +121,12 @@ class DatabaseSetupGenerator extends AbstractGenerator
             if (str_starts_with($line, '#')) {
                 continue;
             }
-            if (str_contains($line, '=')) {
-                [$key, $value] = explode('=', $line, 2);
-                $envVars[trim($key)] = trim($value);
+            if (!str_contains($line, '=')) {
+                continue;
             }
+
+            [$key, $value] = explode('=', $line, 2);
+            $envVars[trim($key)] = trim($value);
         }
 
         return $envVars;
@@ -148,7 +151,7 @@ class DatabaseSetupGenerator extends AbstractGenerator
                 'CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
                 $dbName,
             ));
-            echo "  Database '{$dbName}' created (or already exists)\n";
+            echo sprintf("  Database '%s' created (or already exists)\n", $dbName);
 
             $pdo->exec(sprintf('USE `%s`', $dbName));
 
@@ -171,7 +174,7 @@ class DatabaseSetupGenerator extends AbstractGenerator
         $typo3Cli = $targetDir . '/vendor/bin/typo3';
 
         if (!file_exists($typo3Cli)) {
-            echo "  ERROR: TYPO3 CLI not found at {$typo3Cli}\n";
+            echo sprintf("  ERROR: TYPO3 CLI not found at %s\n", $typo3Cli);
             echo "  Composer install may have failed - check the output above.\n";
             return false;
         }
@@ -209,7 +212,7 @@ class DatabaseSetupGenerator extends AbstractGenerator
         }
 
         if ($returnCode !== 0) {
-            echo "  ERROR: typo3 setup failed (exit code {$returnCode})\n";
+            echo sprintf("  ERROR: typo3 setup failed (exit code %d)\n", $returnCode);
             echo '  ' . implode("\n  ", $output) . "\n";
             return false;
         }
@@ -225,7 +228,7 @@ class DatabaseSetupGenerator extends AbstractGenerator
         try {
             $stmt = $pdo->query('SELECT COUNT(*) FROM `pages` WHERE `uid` IN (1, 2, 3)');
         } catch (PDOException $e) {
-            echo "  WARNING: pages table not available, skipping page creation: " . $e->getMessage() . "\n";
+            echo '  WARNING: pages table not available, skipping page creation: ' . $e->getMessage() . "\n";
             return;
         }
 
@@ -265,7 +268,7 @@ class DatabaseSetupGenerator extends AbstractGenerator
                 'slug' => $page['slug'],
                 'hidden' => 0,
             ]);
-            echo "  Page uid={$page['uid']}: '{$page['title']}' created\n";
+            echo sprintf("  Page uid=%d: '%s' created\n", $page['uid'], $page['title']);
         }
     }
 
@@ -289,30 +292,7 @@ class DatabaseSetupGenerator extends AbstractGenerator
             return;
         }
 
-        $configuration = <<<'XML'
-            <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
-            <T3FlexForms>
-                <data>
-                    <sheet index="sDEF">
-                        <language index="lDEF">
-                            <field index="basePath">
-                                <value index="vDEF">fileadmin/</value>
-                            </field>
-                            <field index="pathType">
-                                <value index="vDEF">relative</value>
-                            </field>
-                            <field index="caseSensitive">
-                                <value index="vDEF">1</value>
-                            </field>
-                            <field index="baseUri">
-                                <value index="vDEF"></value>
-                            </field>
-                        </language>
-                    </sheet>
-                </data>
-            </T3FlexForms>
-            XML;
-        $configuration = preg_replace('/^            /m', '', $configuration) ?? $configuration;
+        $configuration = rtrim($this->renderTemplate('fragments/sys_file_storage_configuration.xml'), "\n");
 
         $now = time();
         $stmt = $pdo->prepare('
@@ -344,7 +324,7 @@ class DatabaseSetupGenerator extends AbstractGenerator
 
     private function insertBeUser(PDO $pdo, string $username, string $email, string $password): void
     {
-        echo "  Creating admin backend user '{$username}'...\n";
+        echo sprintf("  Creating admin backend user '%s'...\n", $username);
 
         try {
             $stmt = $pdo->prepare('SELECT COUNT(*) FROM `be_users` WHERE `username` = :username AND `deleted` = 0');
@@ -355,7 +335,7 @@ class DatabaseSetupGenerator extends AbstractGenerator
 
         $stmt->execute(['username' => $username]);
         if ((int) $stmt->fetchColumn() > 0) {
-            echo "  be_user '{$username}' already exists, skipping admin user creation\n";
+            echo sprintf("  be_user '%s' already exists, skipping admin user creation\n", $username);
             return;
         }
 
@@ -379,6 +359,6 @@ class DatabaseSetupGenerator extends AbstractGenerator
             'workspace_perms' => 1,
         ]);
 
-        echo "  Admin be_user '{$username}' created\n";
+        echo sprintf("  Admin be_user '%s' created\n", $username);
     }
 }

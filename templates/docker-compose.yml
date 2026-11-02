@@ -1,0 +1,49 @@
+services:
+    proxy:
+        build:
+context: ./proxy
+dockerfile: Dockerfile
+        environment:
+PROXY_HOST: ${PROXY_HOST}
+PROXY_PORT_SSL: ${PROXY_PORT_SSL}
+        ports:
+- "${PROXY_PORT}:80"
+- "${PROXY_PORT_SSL}:443"
+        restart: unless-stopped
+        networks:
+- frontend
+        volumes:
+- ${PROXY_SSL_CERT}:/etc/nginx/ssl/server.pem:ro
+- ${PROXY_SSL_KEY}:/etc/nginx/ssl/server.key:ro
+
+    web:
+        build:
+context: .
+dockerfile: Dockerfile
+        environment:
+MYSQL_HOST: ${MYSQL_HOST}
+MYSQL_DATABASE: ${MYSQL_DATABASE}
+MYSQL_USER: ${MYSQL_USER}
+MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+TYPO3_CONTEXT: ${TYPO3_CONTEXT}
+TYPO3_SMTP_USERNAME: ${TYPO3_SMTP_USERNAME}
+TYPO3_SMTP_PASSWORD: ${TYPO3_SMTP_PASSWORD}
+TYPO3_SMTP_SERVER: ${TYPO3_SMTP_SERVER}
+REVERSE_PROXY_IP: ${REVERSE_PROXY_IP}
+        restart: unless-stopped
+        networks:
+- frontend
+        volumes:
+- {{volumePrefix}}_web_public:/var/www/html/public
+- {{volumePrefix}}_web_var:/var/www/html/var
+- ./log:/var/www/html/var/log
+
+networks:
+    frontend:
+        name: frontend
+
+volumes:
+    {{volumePrefix}}_web_public:
+        name: {{volumePrefix}}_web_public
+    {{volumePrefix}}_web_var:
+        name: {{volumePrefix}}_web_var

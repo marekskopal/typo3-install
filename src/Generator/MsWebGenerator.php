@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace MarekSkopal\Typo3Install\Generator;
 
+use const JSON_PRETTY_PRINT;
+use const JSON_UNESCAPED_SLASHES;
+
 class MsWebGenerator extends AbstractGenerator
 {
     private const StaticFiles = [
@@ -77,46 +80,9 @@ class MsWebGenerator extends AbstractGenerator
 
     private function generateExtEmconf(string $targetDir, string $projectName): void
     {
-        $content = <<<PHP
-            <?php
-
-            \$EM_CONF[\$_EXTKEY] = [
-                'title' => '{$projectName} - Web',
-                'description' => 'Web extension.',
-                'category' => 'misc',
-                'shy' => '',
-                'version' => '1.0.0',
-                'dependencies' => '',
-                'conflicts' => '',
-                'priority' => '',
-                'loadOrder' => '',
-                'module' => '',
-                'state' => 'stable',
-                'uploadfolder' => 0,
-                'createDirs' => '',
-                'modify_tables' => '',
-                'clearCacheOnLoad' => 0,
-                'lockType' => '',
-                'author' => 'Marek Skopal',
-                'author_email' => 'skopal.marek@gmail.com',
-                'CGLcompliance' => '',
-                'CGLcompliance_note' => '',
-                'constraints' => [
-                    'depends' => [
-                        'ms_core' => '1.0.0',
-                    ],
-                    'conflicts' =>[
-                    ],
-                    'suggests' => [
-                    ],
-                ]
-            ];
-            PHP;
-
-        // Remove the leading indentation from heredoc
-        $content = preg_replace('/^            /m', '', $content);
-
-        $this->writeFile($targetDir . '/packages/ms_web/ext_emconf.php', $content . "\n");
+        $this->writeTemplate('packages/ms_web/ext_emconf.php', $targetDir . '/packages/ms_web/ext_emconf.php', [
+            'projectName' => $projectName,
+        ]);
     }
 
     private function copyStaticFiles(string $targetDir): void
@@ -129,94 +95,24 @@ class MsWebGenerator extends AbstractGenerator
     /** @param list<array{name: string, version: string}> $extensions */
     private function generateSetupTyposcript(string $targetDir, array $extensions): void
     {
-        $content = <<<'TYPOSCRIPT'
-            page.shortcutIcon = EXT:ms_web/Resources/Public/Icons/favicon.svg
+        $googleFont = $this->hasExtension($extensions, 'marekskopal/typo3-google-font')
+            ? $this->renderTemplate('fragments/google-font.typoscript')
+            : '';
 
-            page.meta {
-                robots = index, follow
-                googlebot = snippet, archive
-                description.override.field = description
-            }
-
-            page.10 {
-                templateName.stdWrap.cObject = CASE
-                templateName.stdWrap.cObject {
-                    pagets__default = TEXT
-                    pagets__default.value = Default.html
-                    pagets__default.insertData = 1
-                }
-            }
-
-            page.includeCSS {
-                print = {$page.includePath.css}print.min.css
-                print.media = print
-
-                lightGallery >
-            }
-
-            page.includeJSFooter {
-                msGallery >
-                main = EXT:ms_web/Resources/Public/Javascript/main.js
-                main.async = 1
-            }
-
-            page.includeJSFooterlibs {
-                jquery >
-                popperjs >
-                bootstrap >
-                lightGallery >
-            }
-
-            TYPOSCRIPT;
-
-        $content = preg_replace('/^            /m', '', $content);
-
-        if ($this->hasExtension($extensions, 'marekskopal/typo3-google-font')) {
-            $googleFont = <<<'TYPOSCRIPT'
-                plugin.tx_msgooglefont {
-                    settings {
-                        fontSrc {
-                            1 = https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap
-                        }
-                    }
-                }
-
-                TYPOSCRIPT;
-
-            $content .= preg_replace('/^                /m', '', $googleFont);
-        }
-
-        $footer = <<<'TYPOSCRIPT'
-            lib.navigation {
-                dataProcessing.30 = TYPO3\CMS\Frontend\DataProcessing\LanguageMenuProcessor
-                dataProcessing.30 {
-                    languages = auto
-                    as = languageNavigation
-                }
-            }
-
-            config.spamProtectEmailAddresses = 0
-            config.spamProtectEmailAddresses_atSubst >
-            config.spamProtectEmailAddresses_lastDotSubst >
-            TYPOSCRIPT;
-
-        $content .= preg_replace('/^            /m', '', $footer);
-
-        $this->writeFile($targetDir . '/packages/ms_web/Configuration/Sets/MsWeb/setup.typoscript', $content . "\n");
+        $this->writeTemplate(
+            'packages/ms_web/Configuration/Sets/MsWeb/setup.typoscript',
+            $targetDir . '/packages/ms_web/Configuration/Sets/MsWeb/setup.typoscript',
+            ['googleFont' => $googleFont],
+        );
     }
 
     private function generateFooterPartial(string $targetDir, string $projectName): void
     {
-        $escapedProjectName = htmlspecialchars($projectName);
-        $content = <<<HTML
-            <footer class="site-footer">
-                <span>&copy;</span> <f:format.date format="Y" date="now" /> <f:link.page pageUid="1">{$escapedProjectName}</f:link.page>
-            </footer>
-            HTML;
-
-        $content = preg_replace('/^            /m', '', $content);
-
-        $this->writeFile($targetDir . '/packages/ms_web/Resources/Private/View/Page/Partials/Footer.html', $content . "\n");
+        $this->writeTemplate(
+            'packages/ms_web/Resources/Private/View/Page/Partials/Footer.html',
+            $targetDir . '/packages/ms_web/Resources/Private/View/Page/Partials/Footer.html',
+            ['projectName' => htmlspecialchars($projectName)],
+        );
     }
 
     private function generateGitkeepFiles(string $targetDir): void

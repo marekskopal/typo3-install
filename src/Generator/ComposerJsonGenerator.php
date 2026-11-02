@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace MarekSkopal\Typo3Install\Generator;
 
+use const JSON_PRETTY_PRINT;
+use const JSON_UNESCAPED_SLASHES;
+
 class ComposerJsonGenerator extends AbstractGenerator
 {
     public function generate(array $config, string $targetDir): void

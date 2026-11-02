@@ -1,0 +1,47 @@
+page.shortcutIcon = EXT:ms_web/Resources/Public/Icons/favicon.svg
+
+page.meta {
+    robots = index, follow
+    googlebot = snippet, archive
+    description.override.field = description
+}
+
+page.10 {
+    templateName.stdWrap.cObject = CASE
+    templateName.stdWrap.cObject {
+        pagets__default = TEXT
+        pagets__default.value = Default.html
+        pagets__default.insertData = 1
+    }
+}
+
+page.includeCSS {
+    print = {$page.includePath.css}print.min.css
+    print.media = print
+
+    lightGallery >
+}
+
+page.includeJSFooter {
+    msGallery >
+    main = EXT:ms_web/Resources/Public/Javascript/main.js
+    main.async = 1
+}
+
+page.includeJSFooterlibs {
+    jquery >
+    popperjs >
+    bootstrap >
+    lightGallery >
+}
+{{googleFont}}lib.navigation {
+    dataProcessing.30 = TYPO3\CMS\Frontend\DataProcessing\LanguageMenuProcessor
+    dataProcessing.30 {
+        languages = auto
+        as = languageNavigation
+    }
+}
+
+config.spamProtectEmailAddresses = 0
+config.spamProtectEmailAddresses_atSubst >
+config.spamProtectEmailAddresses_lastDotSubst >

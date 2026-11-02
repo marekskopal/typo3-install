@@ -53,15 +53,15 @@ class SiteConfigGenerator extends AbstractGenerator
     {
         $yaml = "base: /\n";
         $yaml .= "baseVariants:\n";
-        $yaml .= "  - base: 'https://{$hostname}'\n";
+        $yaml .= sprintf("  - base: 'https://%s'\n", $hostname);
         $yaml .= "    condition: 'applicationContext == \"Production\"'\n";
-        $yaml .= "  - base: 'https://localhost:{$sslPort}'\n";
+        $yaml .= sprintf("  - base: 'https://localhost:%s'\n", $sslPort);
         $yaml .= "    condition: 'applicationContext == \"Development\"'\n";
 
         if ($dependencies !== []) {
             $yaml .= "dependencies:\n";
             foreach ($dependencies as $dependency) {
-                $yaml .= "  - {$dependency}\n";
+                $yaml .= sprintf("  - %s\n", $dependency);
             }
         }
 
@@ -74,44 +74,44 @@ class SiteConfigGenerator extends AbstractGenerator
         $yaml .= "  -\n";
         $yaml .= "    route: robots.txt\n";
         $yaml .= "    type: staticText\n";
-        $yaml .= "    content: \"User-agent: *\\r\\nDisallow: /typo3/\\r\\nSitemap: https://{$hostname}/sitemap.xml\"\n";
+        $yaml .= sprintf("    content: \"User-agent: *\\r\\nDisallow: /typo3/\\r\\nSitemap: https://%s/sitemap.xml\"\n", $hostname);
         $yaml .= "  -\n";
         $yaml .= "    route: sitemap.xml\n";
         $yaml .= "    type: uri\n";
-        $yaml .= "    source: 'https://{$hostname}/?type=1533906435'\n";
+        $yaml .= sprintf("    source: 'https://%s/?type=1533906435'\n", $hostname);
         $yaml .= "languages:\n";
 
         foreach ($orderedLangs as $index => $langCode) {
             $lang = self::LanguageMap[$langCode];
 
             $yaml .= "  -\n";
-            $yaml .= "    title: {$lang['title']}\n";
+            $yaml .= sprintf("    title: %s\n", $lang['title']);
             $yaml .= "    enabled: true\n";
-            $yaml .= "    locale: {$lang['locale']}\n";
-            $yaml .= "    hreflang: {$lang['hreflang']}\n";
+            $yaml .= sprintf("    locale: %s\n", $lang['locale']);
+            $yaml .= sprintf("    hreflang: %s\n", $lang['hreflang']);
 
             if ($index === 0) {
                 $yaml .= "    base: /\n";
             } else {
-                $yaml .= "    base: /{$langCode}/\n";
+                $yaml .= sprintf("    base: /%s/\n", $langCode);
                 $yaml .= "    baseVariants:\n";
-                $yaml .= "      - base: 'https://{$hostname}/{$langCode}/'\n";
+                $yaml .= sprintf("      - base: 'https://%s/%s/'\n", $hostname, $langCode);
                 $yaml .= "        condition: 'applicationContext == \"Production\"'\n";
-                $yaml .= "      - base: 'https://localhost:{$sslPort}/{$langCode}/'\n";
+                $yaml .= sprintf("      - base: 'https://localhost:%s/%s/'\n", $sslPort, $langCode);
                 $yaml .= "        condition: 'applicationContext == \"Development\"'\n";
             }
 
-            $yaml .= "    websiteTitle: {$projectName}\n";
-            $yaml .= "    navigationTitle: {$lang['navigationTitle']}\n";
+            $yaml .= sprintf("    websiteTitle: %s\n", $projectName);
+            $yaml .= sprintf("    navigationTitle: %s\n", $lang['navigationTitle']);
             $yaml .= $index === 0
                 ? "    fallbackType: strict\n    fallbacks: ''\n"
                 : "    fallbackType: fallback\n    fallbacks: '0'\n";
-            $yaml .= "    flag: {$lang['flag']}\n";
-            $yaml .= "    languageId: {$index}\n";
+            $yaml .= sprintf("    flag: %s\n", $lang['flag']);
+            $yaml .= sprintf("    languageId: %d\n", $index);
         }
 
         $yaml .= "rootPageId: 1\n";
-        $yaml .= "websiteTitle: {$projectName}\n";
+        $yaml .= sprintf("websiteTitle: %s\n", $projectName);
 
         return $yaml;
     }

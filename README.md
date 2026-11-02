@@ -79,6 +79,11 @@ Common flags:
 | `-l, --languages <list>` | Comma-separated language codes from `cs,en,de` |
 | `-d, --default-language <code>` | Default language (must be one of `--languages`) |
 | `--setup-db` / `--no-setup-db` | Run / skip database setup |
+| `--db-host <host>` / `--db-port <port>` | Database to set up (defaults: `127.0.0.1` / `3306`); a service name such as `db` when the installer runs in a container on the database's network |
+| `--db-name`, `--db-user`, `--db-password` | Database name and credentials; they become the site's `MYSQL_*` in `.env` |
+| `--admin-username`, `--admin-email`, `--admin-password` | The admin backend user created with the database |
+| `--skip-docker` | Leave out `docker-compose.yml` and `proxy/`, for a project that goes into an existing Docker stack (the `Dockerfile`, `docker/` and `.env` are still written) |
+| `--mcp-base-path <path>` | With `typo3-mcp-server`: the MCP endpoint's path (default `/mcp`; e.g. `/typo3-web/mcp` when another app on the host owns `/mcp`) |
 | `--init-git` / `--no-init-git` | Initialize / skip git repo |
 | `-y, --yes` | Use defaults for any value not provided; requires `--name` and `--hostname` |
 | `--list-extensions` | Show all available extension names |
@@ -87,6 +92,20 @@ Common flags:
 Run `./install.sh --help` for the full reference.
 
 Flags and prompts can be mixed: any value provided via a flag skips its prompt, and the rest are asked interactively as usual.
+
+### Running the installer in a container
+
+The database setup connects from where the installer runs. When the database is a container whose port is not
+published (or the host's own MySQL holds 3306), run the installer in a PHP container on the database's network:
+
+```sh
+docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp --network <stack>_backend \
+    -v "$PWD/typo3-install:/installer" -v "$PWD:/out" -w /out <php-8.5-cli image with pdo_mysql, intl, gd, zip, git, composer> \
+    bash /installer/install.sh -y --name "My Site" --hostname www.mysite.cz --target-dir /out/web \
+    --setup-db --db-host db --db-user root --db-password … --admin-password …
+```
+
+The skill in `.claude/skills/typo3-web-install/` walks through it, including a Dockerfile for that image.
 
 ### Available extensions
 
@@ -129,16 +148,17 @@ mkdir -p ssl && openssl req -x509 -newkey rsa:2048 -nodes -days 825 \
 project/
 ├── packages/ms_web/          # Local TYPO3 theme extension (SCSS, Fluid, TypoScript)
 ├── config/
-│   ├── sites/{name}/         # Site configuration with languages
-│   └── system/               # System settings (DB, mail, caching)
+│   ├── sites/{name}/         # Site configuration (base from TYPO3_BASE_URL, languages, sitemap) and csp.yaml
+│   └── system/               # settings.php (committed, no secrets) and additional.php (env: DB, secrets, SMTP)
 ├── public/                   # Web root
 │   ├── .htaccess             # TYPO3 v14.3 Apache rules
 │   └── fileadmin/.htaccess   # CSP hardening for user uploads (default file storage)
-├── docker/                   # Apache vhost and PHP ini for the web image
+├── docker/                   # Apache vhost, PHP ini and the entrypoint (schema update on start)
 ├── proxy/                    # nginx reverse proxy with TLS
-├── docker-compose.yml        # Docker setup (nginx proxy + PHP/Apache)
+├── docker-compose.yml        # Docker setup (nginx proxy + PHP/Apache); not with --skip-docker
 ├── Dockerfile                # Multi-stage build (PHP, Composer, Node/SCSS)
-├── .env / .env.example       # Ports, SSL cert paths, database and SMTP settings
+├── .dockerignore             # Keeps vendor/, node_modules/ and var/ out of the build context
+├── .env / .env.example       # Ports, SSL cert paths, database, base URL, secrets and SMTP settings
 ├── package.json              # Gulp + SCSS build pipeline
 └── composer.json             # TYPO3 v14.3 dependencies
 ```
@@ -153,6 +173,17 @@ project/
 | Proxy | `nginx:1.31.8-alpine` |
 
 The proxy terminates TLS 1.3 and sends HSTS, `Referrer-Policy`, `X-Frame-Options` and `X-Content-Type-Options` headers on every response.
+
+- **Secrets:** `TYPO3_ENCRYPTION_KEY` and `TYPO3_INSTALL_TOOL_PASSWORD` are generated into `.env`; `settings.php` holds
+  none, so it is committed and an image built from a fresh clone has its configuration.
+- **Base URL:** the site's base is `TYPO3_BASE_URL` (`https://localhost:<ssl-port>/` in development, `https://<hostname>/`
+  in production), so canonical, hreflang and sitemap URLs are absolute everywhere.
+- **Scheme:** Apache sets `HTTPS=on` from the proxy's `X-Forwarded-Proto`, so a plain-http proxy gets http URLs.
+- **Schema updates:** the image's entrypoint runs `cache:flush` and `extension:setup` before Apache starts, so new
+  tables and columns of an updated extension are created on deploy.
+- **Volumes:** only `public/fileadmin` and `var/` persist; `public/` and `config/` come from the image.
+- **Database setup** creates the admin, the root page, the Information folder and its 404 page (owned by the admin, with
+  TYPO3's default permissions) and their translations into every further language, and the `fileadmin` storage.
 
 ## Development
 

@@ -12,6 +12,10 @@ class DockerGenerator extends AbstractGenerator
         'de' => 'de_DE.UTF-8 UTF-8',
     ];
 
+    private const DefaultSslCert = './ssl/server.crt';
+
+    private const DefaultSslKey = './ssl/server.key';
+
     private const StaticFiles = [
         'docker/php-typo3.ini',
         'docker/vhost.conf',
@@ -29,6 +33,8 @@ class DockerGenerator extends AbstractGenerator
         $sslPort = $config['dev_ssl_port'];
         /** @var list<string> $languages */
         $languages = $config['languages'];
+        $sslCert = is_string($config['dev_ssl_cert'] ?? null) ? $config['dev_ssl_cert'] : self::DefaultSslCert;
+        $sslKey = is_string($config['dev_ssl_key'] ?? null) ? $config['dev_ssl_key'] : self::DefaultSslKey;
 
         foreach (self::StaticFiles as $file) {
             $this->copyTemplate($file, $targetDir);
@@ -36,7 +42,7 @@ class DockerGenerator extends AbstractGenerator
 
         $this->generateDockerfile($targetDir, $languages);
         $this->generateDockerCompose($targetDir, $machineName);
-        $this->generateEnvFiles($targetDir, $machineName, $httpPort, $sslPort);
+        $this->generateEnvFiles($targetDir, $machineName, $httpPort, $sslPort, $sslCert, $sslKey);
     }
 
     /** @param list<string> $languages */
@@ -71,7 +77,14 @@ class DockerGenerator extends AbstractGenerator
         ]);
     }
 
-    private function generateEnvFiles(string $targetDir, string $machineName, string $httpPort, string $sslPort): void
+    private function generateEnvFiles(
+        string $targetDir,
+        string $machineName,
+        string $httpPort,
+        string $sslPort,
+        string $sslCert,
+        string $sslKey,
+    ): void
     {
         $variables = [
             'httpPort' => $httpPort,
@@ -79,7 +92,7 @@ class DockerGenerator extends AbstractGenerator
             'dbName' => str_replace('-', '_', $machineName),
         ];
 
-        $this->writeTemplate('env', $targetDir . '/.env', $variables);
+        $this->writeTemplate('env', $targetDir . '/.env', [...$variables, 'sslCert' => $sslCert, 'sslKey' => $sslKey]);
         $this->writeTemplate('env.example', $targetDir . '/.env.example', $variables);
     }
 }

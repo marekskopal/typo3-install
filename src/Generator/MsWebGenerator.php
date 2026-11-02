@@ -81,7 +81,7 @@ class MsWebGenerator extends AbstractGenerator
     private function generateExtEmconf(string $targetDir, string $projectName): void
     {
         $this->writeTemplate('packages/ms_web/ext_emconf.php', $targetDir . '/packages/ms_web/ext_emconf.php', [
-            'projectName' => $projectName,
+            'projectName' => addcslashes($projectName, "'\\"),
         ]);
     }
 

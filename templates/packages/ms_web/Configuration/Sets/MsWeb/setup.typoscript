@@ -34,6 +34,7 @@ page.includeJSFooterlibs {
     bootstrap >
     lightGallery >
 }
+
 {{googleFont}}lib.navigation {
     dataProcessing.30 = TYPO3\CMS\Frontend\DataProcessing\LanguageMenuProcessor
     dataProcessing.30 {

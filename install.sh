@@ -30,6 +30,10 @@ print_error() {
     echo -e "${RED}[x]${NC} $1"
 }
 
+json_escape() {
+    printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
+}
+
 usage() {
     cat <<EOF
 Usage: install.sh [options]
@@ -43,6 +47,10 @@ Options:
   -H, --hostname <host>          Production hostname (e.g. mywebsite.cz)
       --http-port <port>         Development HTTP port (default: 4100)
       --ssl-port <port>          Development HTTPS port (default: 4200)
+      --ssl-cert <path>          Dev SSL certificate for the proxy
+                                 (default: ./ssl/server.crt)
+      --ssl-key <path>           Dev SSL private key for the proxy
+                                 (default: ./ssl/server.key)
   -t, --target-dir <path>        Target directory (default: \$PWD/<machine-name>)
   -e, --extensions <list>        Comma-separated extension names to enable
                                  (e.g. "fontawesome,faq"). The typo3- prefix
@@ -83,6 +91,8 @@ MACHINE_NAME=""
 HOSTNAME=""
 DEV_HTTP_PORT=""
 DEV_SSL_PORT=""
+DEV_SSL_CERT=""
+DEV_SSL_KEY=""
 TARGET_DIR=""
 CLI_EXTENSIONS=""
 CLI_LANGUAGES=""
@@ -115,6 +125,8 @@ while [ $# -gt 0 ]; do
         -H|--hostname) require_value "$1" "$2"; HOSTNAME="$2"; shift 2;;
         --http-port) require_value "$1" "$2"; DEV_HTTP_PORT="$2"; shift 2;;
         --ssl-port) require_value "$1" "$2"; DEV_SSL_PORT="$2"; shift 2;;
+        --ssl-cert) require_value "$1" "$2"; DEV_SSL_CERT="$2"; shift 2;;
+        --ssl-key) require_value "$1" "$2"; DEV_SSL_KEY="$2"; shift 2;;
         -t|--target-dir) require_value "$1" "$2"; TARGET_DIR="$2"; shift 2;;
         -e|--extensions) require_value "$1" "$2"; CLI_EXTENSIONS="$2"; shift 2;;
         -l|--languages) require_value "$1" "$2"; CLI_LANGUAGES="$2"; shift 2;;
@@ -292,6 +304,24 @@ if [ -z "$DEV_SSL_PORT" ]; then
     else
         read -p "Development HTTPS port [4200]: " DEV_SSL_PORT
         DEV_SSL_PORT=${DEV_SSL_PORT:-4200}
+    fi
+fi
+
+if [ -z "$DEV_SSL_CERT" ]; then
+    if [ "$ASSUME_YES" = true ]; then
+        DEV_SSL_CERT="./ssl/server.crt"
+    else
+        read -p "Development SSL certificate path [./ssl/server.crt]: " DEV_SSL_CERT
+        DEV_SSL_CERT=${DEV_SSL_CERT:-./ssl/server.crt}
+    fi
+fi
+
+if [ -z "$DEV_SSL_KEY" ]; then
+    if [ "$ASSUME_YES" = true ]; then
+        DEV_SSL_KEY="./ssl/server.key"
+    else
+        read -p "Development SSL private key path [./ssl/server.key]: " DEV_SSL_KEY
+        DEV_SSL_KEY=${DEV_SSL_KEY:-./ssl/server.key}
     fi
 fi
 
@@ -491,6 +521,8 @@ CONFIG_JSON=$(cat <<JSONEOF
     "hostname": "$HOSTNAME",
     "dev_http_port": "$DEV_HTTP_PORT",
     "dev_ssl_port": "$DEV_SSL_PORT",
+    "dev_ssl_cert": "$(json_escape "$DEV_SSL_CERT")",
+    "dev_ssl_key": "$(json_escape "$DEV_SSL_KEY")",
     "target_dir": "$TARGET_DIR",
     "extensions": $SELECTED_EXT_JSON,
     "languages": $LANGS_JSON,
@@ -636,9 +668,6 @@ if [ "$SETUP_DB" = "y" ]; then
     fi
 
     # Escape values for JSON (backslash and double quote)
-    json_escape() {
-        printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
-    }
     DB_NAME_ESC=$(json_escape "$DB_NAME")
     DB_HOST_ESC=$(json_escape "$DB_HOST")
     DB_USER_ESC=$(json_escape "$DB_USER")
@@ -654,6 +683,8 @@ if [ "$SETUP_DB" = "y" ]; then
     "hostname": "$HOSTNAME",
     "dev_http_port": "$DEV_HTTP_PORT",
     "dev_ssl_port": "$DEV_SSL_PORT",
+    "dev_ssl_cert": "$(json_escape "$DEV_SSL_CERT")",
+    "dev_ssl_key": "$(json_escape "$DEV_SSL_KEY")",
     "target_dir": "$TARGET_DIR",
     "extensions": $SELECTED_EXT_JSON,
     "languages": $LANGS_JSON,

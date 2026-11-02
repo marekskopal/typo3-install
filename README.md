@@ -73,6 +73,7 @@ Common flags:
 | `-H, --hostname <host>` | Production hostname |
 | `-t, --target-dir <path>` | Where the project is created (defaults to `$PWD/<machine-name>`) |
 | `--http-port <port>` / `--ssl-port <port>` | Dev ports (defaults: 4100 / 4200) |
+| `--ssl-cert <path>` / `--ssl-key <path>` | Dev SSL certificate and key for the proxy (defaults: `./ssl/server.crt` / `./ssl/server.key`) |
 | `-e, --extensions <list>` | Comma-separated extension names; the `typo3-` prefix is optional |
 | `-l, --languages <list>` | Comma-separated language codes from `cs,en,de` |
 | `-d, --default-language <code>` | Default language (must be one of `--languages`) |

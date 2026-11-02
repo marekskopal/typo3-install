@@ -19,6 +19,7 @@
 /public
 !/public/.htaccess
 /docker/server.*
+/ssl
 
 docker-compose.override.yml
 /config/system/settings.php

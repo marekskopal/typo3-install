@@ -1,7 +1,7 @@
-FROM mlocati/php-extension-installer:2.11.1 AS php-extension-installer
-FROM composer:2.9.7 AS composer
-FROM node:24.15.0 AS node
-FROM php:8.5.6-apache AS php
+FROM mlocati/php-extension-installer:2.13.2 AS php-extension-installer
+FROM composer:2.11.1 AS composer
+FROM node:24.22.2 AS node
+FROM php:8.5.12-apache AS php
 
 COPY --from=php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
 
@@ -48,6 +48,10 @@ RUN rm -rf /var/www/html/vendor \
     && composer clear-cache
 
 COPY ./public/.htaccess /var/www/html/public/
+# Creates the default file storage's base path. Without it TYPO3 fails to
+# initialize storage [1] on every request that touches a file reference.
+# The .htaccess is TYPO3's CSP hardening for user-uploaded resources.
+COPY ./public/fileadmin/.htaccess /var/www/html/public/fileadmin/
 
 FROM node AS build_frontend
 
@@ -67,7 +71,7 @@ FROM php AS final
 COPY --from=build_frontend /var/www/html/packages/ms_web/Resources/Public /var/www/html/packages/ms_web/Resources/Public
 
 RUN \
-    mkdir -p var && \
+    mkdir -p var/log && \
     chown -R www-data:www-data /var/www/html/
 
 RUN service apache2 restart

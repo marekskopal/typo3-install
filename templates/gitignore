@@ -16,8 +16,13 @@
 /private/typo3conf/*
 !/private/typo3conf/l10n
 
-/public
+# Excludes the contents rather than the directory itself, so the few tracked
+# files below can be re-included (git cannot re-include from an excluded dir).
+/public/*
 !/public/.htaccess
+!/public/fileadmin/
+/public/fileadmin/*
+!/public/fileadmin/.htaccess
 /docker/server.*
 /ssl
 

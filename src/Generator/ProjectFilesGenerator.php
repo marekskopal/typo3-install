@@ -11,6 +11,7 @@ class ProjectFilesGenerator extends AbstractGenerator
         $this->copyTemplate('gitignore', $targetDir, '.gitignore');
         $this->copyTemplate('editorconfig', $targetDir, '.editorconfig');
         $this->copyTemplate('htaccess.txt', $targetDir, 'public/.htaccess');
+        $this->copyTemplate('fileadmin-htaccess.txt', $targetDir, 'public/fileadmin/.htaccess');
 
         $this->writeFile($targetDir . '/log/.gitkeep', '');
 

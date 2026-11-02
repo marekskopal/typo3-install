@@ -26,21 +26,6 @@
 
 ### Begin: Compression ###
 
-# Compressing resource files will save bandwidth and so improve loading speed especially for users
-# with slower internet connections. TYPO3 can compress the .js and .css files for you.
-# *) Uncomment the following lines and
-# *) Set $GLOBALS['TYPO3_CONF_VARS']['BE']['compressionLevel'] = 9 for the Backend
-# *) Set $GLOBALS['TYPO3_CONF_VARS']['FE']['compressionLevel'] = 9 together with the TypoScript properties
-#    config.compressJs and config.compressCss for GZIP compression of Frontend JS and CSS files.
-
-#<FilesMatch "\.js\.gz">
-#	AddType "text/javascript" .gz
-#</FilesMatch>
-#<FilesMatch "\.css\.gz">
-#	AddType "text/css" .gz
-#</FilesMatch>
-#AddEncoding x-gzip .gz
-
 SetEnvIf Host "^local" TYPO3_CONTEXT=Development
 
 <IfModule mod_deflate.c>
@@ -175,6 +160,10 @@ SetEnvIf Host "^local" TYPO3_CONTEXT=Development
 
 	ExpiresByType text/x-cross-domain-policy            "access plus 1 week"
 
+	<FilesMatch "^index\.php$">
+		ExpiresActive Off
+	</FilesMatch>
+
 </IfModule>
 
 ### End: Browser caching of resource files ###
@@ -204,7 +193,7 @@ SetEnvIf Host "^local" TYPO3_CONTEXT=Development
 	AddType application/xml                             rdf xml
 
 	# JavaScript
-	AddType application/javascript                      js
+	AddType application/javascript                      js mjs
 
 	# Manifest files
 	AddType application/manifest+json                   webmanifest
@@ -305,7 +294,7 @@ AddDefaultCharset utf-8
 	# IMPORTANT: This rule has to be the very first RewriteCond in order to work!
 	RewriteCond %{REQUEST_FILENAME} !-f
 	RewriteCond %{REQUEST_FILENAME} !-d
-	RewriteRule ^(.+)\.(\d+)\.(php|js|css|png|jpg|gif|gz)$ %{ENV:CWD}$1.$3 [L]
+	RewriteRule ^(.+)\.(\d+)\.(php|js|mjs|css|png|jpg|gif|svg|avif|webp|gz|xsl|ico)$ %{ENV:CWD}$1.$3 [L]
 
 	# Access block for folders
 	RewriteRule _(?:recycler|temp)_/ - [F]
@@ -322,11 +311,10 @@ AddDefaultCharset utf-8
 
 	# Stop rewrite processing, if we are in any known directory
 	# NOTE: Add your additional local storages here
-	RewriteRule ^(?:fileadmin/|typo3conf/|typo3temp/|uploads/) - [L]
+	RewriteRule ^(?:fileadmin/|typo3conf/|typo3temp/|_assets/|_assets_install/) - [L]
 
 	RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
-
-	# If the file/symlink/directory does not exist but is below /typo3/, redirect to the TYPO3 Backend entry point.
+	# If the file/symlink/directory does not exist but is below /typo3/, redirect to the main TYPO3 entry point.
 	RewriteCond %{REQUEST_FILENAME} !-f
 	RewriteRule ^typo3/(.*)$ %{ENV:CWD}index.php [QSA,L]
 
@@ -342,7 +330,7 @@ AddDefaultCharset utf-8
 # Access block for files
 # Apache < 2.3
 <IfModule !mod_authz_core.c>
-	<FilesMatch "(?i:^\.|^#.*#|^(?:ChangeLog|ToDo|Readme|License)(?:\.md|\.txt)?|^composer\.(?:json|lock)|^ext_conf_template\.txt|^ext_typoscript_constants\.txt|^ext_typoscript_setup\.txt|flexform[^.]*\.xml|locallang[^.]*\.(?:xml|xlf)|\.(?:bak|co?nf|cfg|ya?ml|ts|typoscript|tsconfig|dist|fla|in[ci]|log|sh|sql(?:\..*)?|sqlite(?:\..*)?|sw[op]|git.*|rc)|.*~)$">
+	<FilesMatch "(?i:^\.|^#.*#|^(?:ChangeLog|ToDo|Readme|License)(?:\.md|\.txt)?|^composer\.(?:json|lock)|^ext_conf_template\.txt|^ext_typoscript_constants\.txt|^ext_typoscript_setup\.txt|flexform[^.]*\.xml|locallang[^.]*\.(?:xml|xlf)|\.(?:bak|co?nf|cfg|neon|ya?ml|ts|typoscript|tsconfig|dist|fla|in[ci]|log|sh|sql(?:\..*)?|sqlite(?:\..*)?|sw[op]|git.*|rc)|.*~)$">
 		Order allow,deny
 		Deny from all
 		Satisfy All
@@ -350,7 +338,7 @@ AddDefaultCharset utf-8
 </IfModule>
 # Apache ≥ 2.3
 <IfModule mod_authz_core.c>
-	<If "%{REQUEST_URI} =~ m#(?i:/\.|/\x23.*\x23|/(?:ChangeLog|ToDo|Readme|License)(?:\.md|\.txt)?|/composer\.(?:json|lock)|/ext_conf_template\.txt|/ext_typoscript_constants\.txt|/ext_typoscript_setup\.txt|flexform[^.]*\.xml|locallang[^.]*\.(?:xml|xlf)|\.(?:bak|co?nf|cfg|ya?ml|ts|typoscript|tsconfig|dist|fla|in[ci]|log|sh|sql(?:\..*)?|sqlite(?:\..*)?|sw[op]|git.*|rc)|.*~)$#">
+	<If "%{REQUEST_URI} =~ m#(?i:/\.|/\x23.*\x23|/(?:ChangeLog|ToDo|Readme|License)(?:\.md|\.txt)?|/composer\.(?:json|lock)|/ext_conf_template\.txt|/ext_typoscript_constants\.txt|/ext_typoscript_setup\.txt|flexform[^.]*\.xml|locallang[^.]*\.(?:xml|xlf)|\.(?:bak|co?nf|cfg|neon|ya?ml|ts|typoscript|tsconfig|dist|fla|in[ci]|log|sh|sql(?:\..*)?|sqlite(?:\..*)?|sw[op]|git.*|rc)|.*~)$#">
 		Require all denied
 	</If>
 </IfModule>
